@@ -80,12 +80,33 @@ def main() -> None:
             audios,
             sampling_rate=16_000,
             return_tensors="pt",
-            padding=True,
+            padding="max_length",
+            truncation=True,
+            return_attention_mask=True,
         )
-        inputs = {k: v.to(device) for k, v in inputs.items()}
+        if "input_features" not in inputs:
+            raise ValueError(f"Expected processor to return input_features, got keys: {list(inputs)}")
+        
+        input_features = inputs["input_features"]
+        
+        if input_features.shape[-1] != 3000:
+            raise ValueError(
+                f"Whisper expects input_features length 3000, "
+                f"got shape {tuple(input_features.shape)}"
+            )
+        
+        model_dtype = next(model.parameters()).dtype
+        
+        input_features = input_features.to(device=device, dtype=model_dtype)
+        
+        attention_mask = inputs.get("attention_mask")
+        if attention_mask is not None:
+            attention_mask = attention_mask.to(device=device)
+        
         with torch.no_grad():
             generated = model.generate(
-                **inputs,
+                input_features=input_features,
+                attention_mask=attention_mask,
                 do_sample=False,
                 num_beams=args.num_beams,
                 max_new_tokens=args.max_new_tokens,
