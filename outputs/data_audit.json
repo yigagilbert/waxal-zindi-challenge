@@ -1,0 +1,1092 @@
+{
+  "character_inventory": {
+    "lin": {
+      "characters": "\n !\"&',-./0123456789:;=?ABCDEFGHIJKLMNOPQRSTUVWXYZ`abcdefghijklmnopqrstuvwxyz «»ÉàáâçèéêìíîïñòóôùûüþĝĶķĹĺŒœ“”⭐️",
+      "non_ascii": " «»ÉàáâçèéêìíîïñòóôùûüþĝĶķĹĺŒœ“”⭐️",
+      "num_unique": 111,
+      "specials": "!\"&',-./:;=?`«»“”⭐️",
+      "top": [
+        [
+          " ",
+          433617
+        ],
+        [
+          "a",
+          404334
+        ],
+        [
+          "o",
+          211569
+        ],
+        [
+          "n",
+          178424
+        ],
+        [
+          "i",
+          162502
+        ],
+        [
+          "e",
+          150666
+        ],
+        [
+          "m",
+          103387
+        ],
+        [
+          "l",
+          102978
+        ],
+        [
+          "b",
+          102192
+        ],
+        [
+          "k",
+          93344
+        ],
+        [
+          "y",
+          77412
+        ],
+        [
+          "t",
+          66087
+        ],
+        [
+          "s",
+          62365
+        ],
+        [
+          "z",
+          54226
+        ],
+        [
+          "g",
+          47792
+        ],
+        [
+          "u",
+          35762
+        ],
+        [
+          "p",
+          34230
+        ],
+        [
+          "d",
+          22559
+        ],
+        [
+          "w",
+          18608
+        ],
+        [
+          ",",
+          13203
+        ],
+        [
+          ".",
+          13036
+        ],
+        [
+          "r",
+          11008
+        ],
+        [
+          "c",
+          6695
+        ],
+        [
+          "f",
+          5202
+        ],
+        [
+          "h",
+          3944
+        ],
+        [
+          "A",
+          3110
+        ],
+        [
+          "N",
+          2573
+        ],
+        [
+          "B",
+          2526
+        ],
+        [
+          "v",
+          2448
+        ],
+        [
+          "E",
+          1884
+        ],
+        [
+          "M",
+          1703
+        ],
+        [
+          "é",
+          1292
+        ],
+        [
+          "L",
+          1146
+        ],
+        [
+          "K",
+          830
+        ],
+        [
+          "j",
+          800
+        ],
+        [
+          "O",
+          700
+        ],
+        [
+          "q",
+          608
+        ],
+        [
+          "-",
+          582
+        ],
+        [
+          "\n",
+          517
+        ],
+        [
+          "P",
+          498
+        ]
+      ]
+    },
+    "lug": {
+      "characters": "\n !\"',-.0146:;<>?ABCDEFGHIJKLMNOPRSTUVWYZabcdefghijklmnopqrstuvwxyzàŊŋᵑ",
+      "non_ascii": "àŊŋᵑ",
+      "num_unique": 71,
+      "specials": "!\"',-.:;<>?",
+      "top": [
+        [
+          "a",
+          179759
+        ],
+        [
+          " ",
+          171620
+        ],
+        [
+          "i",
+          97055
+        ],
+        [
+          "e",
+          87273
+        ],
+        [
+          "u",
+          83002
+        ],
+        [
+          "n",
+          76441
+        ],
+        [
+          "o",
+          65760
+        ],
+        [
+          "b",
+          59480
+        ],
+        [
+          "k",
+          59062
+        ],
+        [
+          "m",
+          53038
+        ],
+        [
+          "l",
+          46322
+        ],
+        [
+          "g",
+          41240
+        ],
+        [
+          "y",
+          35621
+        ],
+        [
+          "w",
+          29252
+        ],
+        [
+          "t",
+          27655
+        ],
+        [
+          "r",
+          27551
+        ],
+        [
+          "d",
+          26398
+        ],
+        [
+          "s",
+          18787
+        ],
+        [
+          "z",
+          17501
+        ],
+        [
+          "'",
+          16337
+        ],
+        [
+          ".",
+          11981
+        ],
+        [
+          "j",
+          7775
+        ],
+        [
+          ",",
+          7373
+        ],
+        [
+          "v",
+          4460
+        ],
+        [
+          "f",
+          4334
+        ],
+        [
+          "E",
+          4018
+        ],
+        [
+          "p",
+          3568
+        ],
+        [
+          "O",
+          1994
+        ],
+        [
+          "A",
+          1770
+        ],
+        [
+          "K",
+          862
+        ],
+        [
+          "M",
+          849
+        ],
+        [
+          "N",
+          716
+        ],
+        [
+          "W",
+          575
+        ],
+        [
+          "B",
+          521
+        ],
+        [
+          "ŋ",
+          466
+        ],
+        [
+          "c",
+          432
+        ],
+        [
+          ";",
+          356
+        ],
+        [
+          "h",
+          279
+        ],
+        [
+          "U",
+          177
+        ],
+        [
+          "L",
+          138
+        ]
+      ]
+    },
+    "sna": {
+      "characters": "\n !\"&'(),-./012345789;ABCDEFGHIJKLMNOPQRSTUVWXYZ`abcdefghijklmnopqrstuvwxyz×àáéíñòóúā",
+      "non_ascii": "×àáéíñòóúā",
+      "num_unique": 85,
+      "specials": "!\"&'(),-./;`×",
+      "top": [
+        [
+          "a",
+          451677
+        ],
+        [
+          " ",
+          362069
+        ],
+        [
+          "i",
+          259811
+        ],
+        [
+          "e",
+          190143
+        ],
+        [
+          "u",
+          184275
+        ],
+        [
+          "r",
+          169352
+        ],
+        [
+          "n",
+          162589
+        ],
+        [
+          "k",
+          141897
+        ],
+        [
+          "m",
+          131872
+        ],
+        [
+          "o",
+          108977
+        ],
+        [
+          "v",
+          92894
+        ],
+        [
+          "h",
+          90952
+        ],
+        [
+          "w",
+          83935
+        ],
+        [
+          "z",
+          81147
+        ],
+        [
+          "t",
+          75973
+        ],
+        [
+          "d",
+          67544
+        ],
+        [
+          "s",
+          58603
+        ],
+        [
+          "b",
+          45908
+        ],
+        [
+          "y",
+          42794
+        ],
+        [
+          ".",
+          42439
+        ],
+        [
+          "p",
+          42212
+        ],
+        [
+          "g",
+          39935
+        ],
+        [
+          "c",
+          34180
+        ],
+        [
+          "f",
+          15629
+        ],
+        [
+          "M",
+          11541
+        ],
+        [
+          ",",
+          8044
+        ],
+        [
+          "P",
+          6926
+        ],
+        [
+          "j",
+          4395
+        ],
+        [
+          "N",
+          4082
+        ],
+        [
+          "V",
+          3659
+        ],
+        [
+          "K",
+          2651
+        ],
+        [
+          "I",
+          2476
+        ],
+        [
+          "C",
+          2135
+        ],
+        [
+          "Z",
+          1965
+        ],
+        [
+          "A",
+          1767
+        ],
+        [
+          "U",
+          1465
+        ],
+        [
+          "R",
+          1233
+        ],
+        [
+          "D",
+          1216
+        ],
+        [
+          "S",
+          1188
+        ],
+        [
+          "l",
+          680
+        ]
+      ]
+    }
+  },
+  "duplicate_ids": {
+    "sample_ids": {
+      "count": 0,
+      "examples": []
+    },
+    "test_ids": {
+      "count": 0,
+      "examples": []
+    },
+    "train_ids": {
+      "count": 0,
+      "examples": []
+    }
+  },
+  "examples": {
+    "apostrophes": [
+      {
+        "id": "lug_96123",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ekyuma ekyakolebwa Bamagulumeeru nga kiri mu makkati g'ennyanja era nga kizingiddwako akaguwa ak'ekikobe."
+      },
+      {
+        "id": "lug_96152",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Amaato abali gali ku mazzi amateefu ng'ebbali waliyo ng'ebbali waliyo ekisiko oba ebimera ebya langi eya kiragalalagala enyirira ng'era kiraga we biri wagimu."
+      },
+      {
+        "id": "lug_96158",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ebintu eby'enjawulo ebiriibwa ziyite nga enva endiirwa, okuli ebikoola bya ssukuma wiiki, ennyaanya, aa obutungulu waliwo wano eno obujanjaalo bw'Abafalansa biri mu butimba obw'enjawulo era nga bitundibwa."
+      },
+      {
+        "id": "lug_96135",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Akatale k'ennyaanya, kkaloti, obuti bwe bakozesa okufumba, ensujju, ennaanansi, wootammeroni, amenvu, emicungwa n'ebirala. Kalimu omusajja ayambadde essaati eya kkala eya pinki n'omukazi atudde ayambadde ggomesi ya bbulu."
+      },
+      {
+        "id": "lug_54316",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ekifaananyi kino kiraga empeke ez'enjawulo: mulimu empeke empeke enjeru, ne mubeeramu kkapiso, ne mubaamu empeke eza yero, ne mubaamu empeke enjeru, ne mubaamu n'empeke za bbulu, ne mubaamu ne kkapiso za ggule."
+      },
+      {
+        "id": "lug_54328",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Enju bbiri ennetooloovu eziyitibwa obusiisira baaziseresa na ssubi. Eh oluggya lunene ddala era luliko ttaka lyereere tekuli busubi. Ebbali waliyo omuddo oguli mu kkala eya kiragala. Mu luggya waliwo n'omuti oguyitibwa akatoogo nga muwanvu ddala."
+      },
+      {
+        "id": "lug_54379",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ekisolo ky'omu nsiko kinene kigalamidde wansi mu muddo mutoototo mu langi ya kiragala, kiyina n'essanga. Tukisomako, ensi yaffe ekifunamu ssente kubanga abantu bajja ne bakirambula."
+      },
+      {
+        "id": "lug_54395",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Empologoma bbiri nga ziri waggulu ku muti empologoma kisolo kya maanyi nnyo era kimanyikiddwa nga kabaka w'ensiko. Empologoma mu Buganda muziro era bagyeddira."
+      }
+    ],
+    "empty_after_strip": [
+      {
+        "id": "lin_9193",
+        "language": "lin",
+        "original_split": "train",
+        "transcription": "\n"
+      }
+    ],
+    "long_transcripts": [
+      {
+        "id": "lug_16306",
+        "language": "lug",
+        "original_split": "validation",
+        "transcription": "Ekifaananyi kino kiraga akatale akatundibwamu ebintu eby'enjawulo, wano waliwo wootammeroni, waliwo emiyembe, waliwo kkalotisi, waliwo ensujju, waliwo ennaanansi, waliwo kkojetisi, uh waliwo obu uh ennyaanya ndaba ndabawo gguliinipepa, ndabawo red paper, byonna ebikozesebwa mu kufumba kitegeeza akatale kano eno kalimu ebintu oba omudaala guno guliko ebintu eby'enjawulo abantu abafumba bye bakozesa nga bagula. Bw'oyingira mu katale kano teweetaaga ate kutunula wantu walala wonna ebyetaago naye er"
+      },
+      {
+        "id": "lug_8111",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ennyumba enkadde ng'emogosemogose yali efuuyiddwako aka akalangi akeeru naye yonna emogosemogose nga yazimbibwa beeyambisa ensagazi n'ebbu ne n'ebbumba n'ettosi eddo lye tuyita eddongo ennyumba amabaati gaayo gakaddiye. Ennyumba eno nga mu mabbali gaayo bazimbyeyo ennyumba naye yo bagizimbisizza matoffaali ate era nga tulaba emiti egiriwo egy'enjawulo wansi mmaaso g'ennyumba eno waliwo oluggi olwavaamu lwe batadde ebbali ate n'olulala luggule. Ennyumba eno mmaaso gaayo waliwo obuti obw'enjawulo "
+      },
+      {
+        "id": "lug_1925",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Emmotoka etukubye kabina emmotoka eno kika kya ttakisi ya langi ya kiragala emmotoka eno ewandiikiddwako ebigambo, ebigambo biri mu langi njeru emmotoka eno etambuza balambuzi tulaba waliwo n'obubonero obukola ku luguudo obulaga nti wa mmaaso waliyo akabenje emmotoka eno eri ku luguudo lwa ttaka tulaba ng'obudde bwa misana bulungi era omusana gwaka ssayidi wali tulengera emiti emiti gino giriko langi ya kiragala. Tulaba ekizimbe kizimbisiddwa mabaati ssayidi wano waliwo emmotoka epaakinze, tulab"
+      },
+      {
+        "id": "lug_69972",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ndaba luumu erimu abantu bana, erimu omwami omu akutte  ngalo, ku mumwa ayambadde gaalubindi. Omwami ono mweru, waliwo n'omukyala, naye mu mweru,  enviiri za bbulaaka, topopu ya bulaaka, sikaati wansi ayambadde ya mmyufu erimu ebya bbulu, bonna beeru bali ku byuma bikalimagezi  kalimagezi balina bye beetegereza. Wabbali waliwo omukyala ali ku  katabe ka bbulu, ka jjiini ka bbulu katoopu ka bbulaaka, ataddeeko ttopi ku mutwe ya bbulu, akutta ku mukono kuliko mulenganjuba. Waliwo n'omwami omulala "
+      },
+      {
+        "id": "lug_43479",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Tuli mu katale akatale kalimu omukyala omukyala ayimiridde omukyala mweru asibye akatambaala ku mutwe ayambadde bulungi akateeteeyi ke asibyeko leesu ayina ennyaanya mu mu mu ngalo uh endala ziri mu bbaafu ya bbulu. Wali waliwo emmeeza emmeeza nayo eriko emirengo gy'ennyaanya waliwo akataasa aka bbulu omukwafu kalimu ennyaanya waliwo akasero aka layitibbulu. Sayidi eno waliyo ennyaanya emirengo miyitirivu waliwo akasero mm kalimu obutungulu, waliwo n'akalala kalimu uh obummonde kale omukyala ono"
+      },
+      {
+        "id": "lug_32745",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Obudde bwa misana, tuli ku mabbali ku lubalama lw'ennyanja waliwo amaato ataano galandinze eddala eryomukaaga liri mu nnyanja lituddeko abantu babiri, emabbali waliwo n'obuyumba bubiri akayumba akamu ka mabaati makadde akalala kaserekeddwa na ssubi. Waliwo omuddo, omuddo guno gwa kiragala si mukulu nnyo. Waliwo amuwa abantu abali mu kkubo, omuwala omu akulembeddemu asibye akagoye ku mukono ayambadde ne ttoopu ya ppinki atunudde mabega emabega we waliwo omukyala a ajja akulembeddwamu akaana akato"
+      },
+      {
+        "id": "lug_87310",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ekizimbe kino kiyina mu maaso gaakyo kiyina ebivu ebi eby'okuvuga bisatu, waliwo eppikipiki bbiri, waliwo eggaali, eno emabbali gaayo waliyo emmotoka ennene eri mu langi emmyukirivu. Ekizimbe kisiigiddwa langi emmyukirivu, kiriko n'ebigambo n'omupiira. Ebigambo ebisooka biri mu langi enjeru, ebigambo eby'okubiri biri mu langi nzirugavu. Ekizimbe kino kiraga nti basibirawo omuzannyo gw'obupapula bano abasiba emipiira. Waliwo n'amadduuka agaliraanyeewo wabbali w'ekizimbe agaddako. Kuliko n'ekifaan"
+      },
+      {
+        "id": "lug_46279",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Bitoogo ebitoogo birimu ko ne ku muddo omula omuddo omulala, omuddo guno gulimu obumuli obumyu, oo obwa kyenvu, ku bitoogo nno kuno kuyimiriddeko ebinyonyi, ebinyonyi bibiri, ebinyonyi bino si binene nnyo bitonotono. Ebitoogo nno bino bikozesebwa babitema mu lusaalu kuba bibeera mu lusaalu ne babiggyayo ne babireeta ne babiyuguluza oluusi ne babiruka ne babiyuguluza ne babirukamu obuwempe obutono, obuwempe obwo obutono nno emirembe lwakuba gigenda gi gi gikyuka oluusi bu bwatulwako wansi nga bat"
+      }
+    ],
+    "newlines": [
+      {
+        "id": "lug_44281",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ennyumba eri mu kuzimbibwa abasajja bana bali mu kuzimba nnyumba, bali mu kusereka, \nnnyumba  eno eziki...  ezimbiddwa bbulooka zino ennene era ng'eri ku luba ku lubalama lw'ennyanja."
+      },
+      {
+        "id": "lug_89018",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Wano tulaba ekiwuka kye bayita evvuuvuumira nga kiriko omwoya omweru ku mugongo nakyo kyennyini kiddugavu nga kizze ewali ekimuli okunuunamu omubisi nga oyinza okulowooza ziringa njuki naye nga mavuuvuumira. Gali mu bunankani ganuuna mu bumuli nga mulimu obweru n'obwa kikuusikuusi ng'era waliwo ne kkala eya kiragala nga bigenda biryako birya binywamu binywamu binywamu binuunamu binuunamu binuunamu bwe bityo. Ago bagayita amavuuvuumira. \n"
+      },
+      {
+        "id": "lug_14342",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Enjuki ng'egudde ku kimuli. Ekimuli kirimu ebya kyenvu ate nga n'obutiititi bwa kiragala. Enjuki eno nzirugavu ng'erimu n'ebya kyenvu.\n"
+      },
+      {
+        "id": "lug_63365",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Essundiro ly'amafuta liri kumpi n'oluguudo olw'ettaka, sayidi eri endala waliyo emiti ssaako n'ennyumba ku ssundiro kuliko abantu ab'enjawulo nga bano balabika okuba \nabakozi  ba ku ssundiro eryo."
+      },
+      {
+        "id": "lug_8510",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ono muntu ataggulula butimba. Ennyanja eriko amayengo, era amazzi galabika nga gali mu mu langi ya bbululu n'enjeru, obudde bwa misana.\n"
+      },
+      {
+        "id": "lug_59575",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ebintu ebyobuwangwa \nokuli ebibumbe, okuli engoye ate era n'ebibajje bitekateekeddwa bulungi era nga biteereddwa awo abaguzi okubirabirako ate era ne weeronderako ky'oyagala. Kuno kuliko engoye, kuliko mmaapu, kuliko ensaasi kuliko eŋŋoma embajje ate era n'ebisiige eby'enjawulo. Ekifo kino kirabika nga dduuka eritunda eby'obuwangwa bya Uganda."
+      },
+      {
+        "id": "lug_91949",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ekifaananyi kino kiraga ekyererezi ky'eki ky'ebirime ebiraga nti birabika ng'amajaani wano ewasooka naye ate ng'eri ewasemba waliyo n'amayumba ag'enjawulo ge tulabako ah ebya waggulu, nga n'embeera y'obudde eraga nti nnungi. Waliwo wano mu maaso walaga ng'ewali akasana ate n'eri walaga nti embeera si mbi okusinziira ku ndabika y'obudde. \n"
+      },
+      {
+        "id": "lug_31881",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Abaana batudde mu kibiina. Abaana bano bali ba ssomero era bayizi. \nAbaana bano bali mu ssomo ery'ebyemikono. Abaana bano, essomo ly'ebyemikono lye baliko bali mu kuluka bitambaala.  Ebitambaala tubirukisa ewuzi. Abaana bano abakulembedde ababiri bambadde empale ez'epiru oba ziyite ennyimpi. Bakubye ebikalu."
+      }
+    ],
+    "numbers": [
+      {
+        "id": "lug_37063",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Emmotoka ekika kya Land Cruiser eriko number plate UAR 004A eyimiridde era ng'emabbali waayo waliwo obu... akagaali akatisse enkota z'amatooke nga nnyingi ng'ate nnene ddala. Eriwo n'abantu abayimiridde, abatunda, abasuubula, n'abantu abalala bangi bali ku kkubo ery'ettaka."
+      },
+      {
+        "id": "lug_51573",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Wano waliwo abasambi b'omupiira; omu ayambadde sitookisi ya kipaapaali ng'eriko ebiddugavu n'engatto njeru, omulala ayambadde essaatu njeru empale njeru ng'eriko ennamba 16 mu kkala eya bbululu, ayambadde n'engatto ziriko obwa kyenvunvu."
+      },
+      {
+        "id": "lin_49048",
+        "language": "lin",
+        "original_split": "train",
+        "transcription": "Awa nazomona mutuka ya monene ya V8,bazoteka yango namoni bakomi a vendre motuka yango eza na langi ya mwindu."
+      },
+      {
+        "id": "lin_995",
+        "language": "lin",
+        "original_split": "train",
+        "transcription": "Na epanzeli ya sango oyo eza na lisanga ya libota lisanga ya libota oyo esaleli ya  bat22a mwana moke mwa moke akangami suki ya ndambu asembi kalatasi na maboko na ye aza kosika alatikangana eza na lange ya mosaka taambasanalangeyatata mobali mosusu alati semesi eza na langi ya 22 esangami nango."
+      },
+      {
+        "id": "lin_46547",
+        "language": "lin",
+        "original_split": "train",
+        "transcription": "Na bilili oyo nga nali komona ba lakisi nga bala bala, mpe nali komona yango malamu te nde foto ezali bato bazo tambola na bala bala oyo namoni pancarte moko ya 4G."
+      },
+      {
+        "id": "lin_58257",
+        "language": "lin",
+        "original_split": "train",
+        "transcription": "Zone militaire de defense n9 na brazaville eza biro ya basoda."
+      },
+      {
+        "id": "lin_62677",
+        "language": "lin",
+        "original_split": "train",
+        "transcription": "Bwate oyo ozokomona eza bwate ya kisi, kisi yango  eza clorapenicol ekomi corapenicol. bwate yango eza ya 1 ml eza na Langi ya mosaka ,ya pembe ekomi corapenicol."
+      },
+      {
+        "id": "lin_60632",
+        "language": "lin",
+        "original_split": "train",
+        "transcription": "Ba awa baza ko lakisa biso buku oyo ba bengi le tresaure de pixo ba lobi aventurier de 7 maire elingi ko loba bana mike oyo baza ko lakisa na buku awa soki okoti na kati okomona baza kotambola na kati ya ba ebale sa baza kotambola na kati baza koluka luka soki biloko nini oyo nde yango wana ba bengi aventure."
+      }
+    ],
+    "punctuation": [
+      {
+        "id": "lug_96123",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ekyuma ekyakolebwa Bamagulumeeru nga kiri mu makkati g'ennyanja era nga kizingiddwako akaguwa ak'ekikobe."
+      },
+      {
+        "id": "lug_96152",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Amaato abali gali ku mazzi amateefu ng'ebbali waliyo ng'ebbali waliyo ekisiko oba ebimera ebya langi eya kiragalalagala enyirira ng'era kiraga we biri wagimu."
+      },
+      {
+        "id": "lug_96158",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ebintu eby'enjawulo ebiriibwa ziyite nga enva endiirwa, okuli ebikoola bya ssukuma wiiki, ennyaanya, aa obutungulu waliwo wano eno obujanjaalo bw'Abafalansa biri mu butimba obw'enjawulo era nga bitundibwa."
+      },
+      {
+        "id": "lug_96135",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Akatale k'ennyaanya, kkaloti, obuti bwe bakozesa okufumba, ensujju, ennaanansi, wootammeroni, amenvu, emicungwa n'ebirala. Kalimu omusajja ayambadde essaati eya kkala eya pinki n'omukazi atudde ayambadde ggomesi ya bbulu."
+      },
+      {
+        "id": "lug_54316",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ekifaananyi kino kiraga empeke ez'enjawulo: mulimu empeke empeke enjeru, ne mubeeramu kkapiso, ne mubaamu empeke eza yero, ne mubaamu empeke enjeru, ne mubaamu n'empeke za bbulu, ne mubaamu ne kkapiso za ggule."
+      },
+      {
+        "id": "lug_54323",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Abaana bava ku mazzi, bana bawala bataano bawala, omulenzi omu. Abana beetisse amazzi, abasatu beetisse liitakkumi, omu yeetisse akadomola akatono. Ababiri bayimiridde wali emabbali, bayita mu kakubo katini nnyo."
+      },
+      {
+        "id": "lug_54328",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Enju bbiri ennetooloovu eziyitibwa obusiisira baaziseresa na ssubi. Eh oluggya lunene ddala era luliko ttaka lyereere tekuli busubi. Ebbali waliyo omuddo oguli mu kkala eya kiragala. Mu luggya waliwo n'omuti oguyitibwa akatoogo nga muwanvu ddala."
+      },
+      {
+        "id": "lug_54379",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ekisolo ky'omu nsiko kinene kigalamidde wansi mu muddo mutoototo mu langi ya kiragala, kiyina n'essanga. Tukisomako, ensi yaffe ekifunamu ssente kubanga abantu bajja ne bakirambula."
+      }
+    ],
+    "quotes": [
+      {
+        "id": "lug_11428",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ekifaananyi kino kiraga omuntu eyali atunga olugoye era nga yali akozesa kyuma ekiyitibwa ekyalaani eky'amasannyalaze. Tulaba nga kuliko olukoba olupima ate ng'omuntu oyo muddugavu, ayambadde akakomo akaliko akagambo akagamba nti, \"I love Jesus\" oba njagala Yesu."
+      },
+      {
+        "id": "lug_42148",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ono nnawolovu nnawolovu ano ali ku butabi bwo bw'olukoni nnawolovu ono mmumanyiiko kimu akyusa kkala bw'atuuka awantu awali kkala ng'akyuka agifaanana nnawolovu ono asooba nnyo naye kye mmumanyiiko mugezi waaliwo empaka ez'emisinde gy'ebisolo nnawolovu yeerippa ku mukira gw'enjovu enjovu egenda okutuuka nga nnawolovu agigamba, \"Tontuulira nnatudde dda.\" Olukoni luno kw'ayimiridde lulina amasanda balukozesa okuwonya ensu."
+      },
+      {
+        "id": "lug_3743",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ennyumba ez'amaduuka, ng'emu esiigiddwa langi eya kyenvu eya MTN. Mu maaso gaayo bataddewo kkuleeti za sooda era waliwo n'akayumba ka \"mobile money.\" Eyookubiri yasiigibwa langi ya kiragala na njeru era batundiramu ngoye."
+      },
+      {
+        "id": "lug_16789",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Omusajja ng'avuga pikipiki ku luguudo olwa kkoolaasi. Ayambadde \"reflector jacket\" era ayambadde ne elementi. Ayita mu kitundu ng'oluuyi n'oluuyi kuliko emiti."
+      },
+      {
+        "id": "lug_8461",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Bino birabika nga bizimbe bya ssomero okusinziira ku nfaanana y'enzimba. Waliwo n'ebipipa omuteekebwa kasasiro nga kuliko ekigambo nti \"Kuuma ekifo kino nga kiyonjo\". Ebibiina bisibe era ku ssomero kuno tekuliiko muyizi n'omu."
+      },
+      {
+        "id": "lin_74163",
+        "language": "lin",
+        "original_split": "train",
+        "transcription": "Awa eza restaurant ya ba mindele kombo nango \"L' Assiette\" tozo mona pe mwasi ya mundele na kati atelemi."
+      },
+      {
+        "id": "lin_42055",
+        "language": "lin",
+        "original_split": "train",
+        "transcription": "Na , Esika na komi awa lisusu bandeko nazomona eza mwa buku, moko buku moko mpena ya kitoko mingi mpona kotanga ! buku oyo bakomi na kati wapiti \" L'œil sur  la nature\" ,   eza buku moko pena ya kitoko mpona kotanga ."
+      },
+      {
+        "id": "lin_72190",
+        "language": "lin",
+        "original_split": "train",
+        "transcription": "Awa tomoni ndako. Ndako eza ya monene makasi mais libanda wana tomoni mutu azotambola, na pembéni nango, tomoni batié bandérole, na kati ya bandérole wana, soki ozumé bien, okomona bakomi \"la foi ne suffit pas\"mais eza na drapaux liboso ya ndako wana."
+      }
+    ],
+    "unusual_characters": [
+      {
+        "id": "lug_59469",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ennyumba ya mabaati, amabaati gano ga kategula oba ettegula. Ennyumba eno eriko ekikomera. Mu maaso g'ennyumba eno n'emabbali yonna waliyo emiti> Emiti gya kiragla, ebbali waliyo ebitooke, ku bitooke kuliko ettooke, ettooke mmere. Obudde bwa misana, akasana kaaka eggulu lyeru, ennyumba twegekamu oluba oba kuyite okwebaka."
+      },
+      {
+        "id": "lug_65553",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Bwe ntunula mu kifaananyi kino ndabamu amazzi era nga <skip> mazzi ndabawo ebiyinjayinja n'obusubi obutonotono naye nga bwe nneetegereza ennyo ndabawo nga ekintu ekiri mu nkola nga eya ggoonya nga kitambula kidda mu mazzi."
+      },
+      {
+        "id": "lug_94744",
+        "language": "lug",
+        "original_split": "train",
+        "transcription": "Ndaba omusajja agezaako okulaga obutali bumativu bwe nga <skipped> mu nkola ey'okwekalakaasa ng'agamba nti kiyina okkoma kati."
+      },
+      {
+        "id": "lin_99232",
+        "language": "lin",
+        "original_split": "train",
+        "transcription": "foto namoni awa `,namoni eza biloko ya koliya namoni  ba legume, mbisi  ya mayi na pilipili"
+      },
+      {
+        "id": "lin_7189",
+        "language": "lin",
+        "original_split": "train",
+        "transcription": "Foto namoni balakisi awa, manoni eza drapeau,  drapeau ya ⭐️ALTETICO MADRID⭐️ eh! Eza couleur mingi, nde namoni awa, ba couleur ya bleu, pembe, eh! Ya rouge na jaune,  nde foto namoni balakisi awa."
+      },
+      {
+        "id": "lin_93902",
+        "language": "lin",
+        "original_split": "train",
+        "transcription": "awa liboso nangayi namoni tapi moko ya vert nakati ya ndaku heee tapi wana eza naba kiti  ba kiti ya kitoko ya  mabende ya mabende ya kitoko  eza pe naba cousin ya vert ,pembe  esangam=ni ba couleur mingi nde nazomona yango."
+      },
+      {
+        "id": "lin_58753",
+        "language": "lin",
+        "original_split": "train",
+        "transcription": "awa liboso na ngayi namoni batu batu misatu baho bina ba dance traditionnel na moni pe  biloko oyo balati  eya bilamba ya  traditionnel batiye mosusu na mutu balati na mikolo nabango baza pe pembeni nabango baza pe na  bounf=da ya jaune esangami na mwindu bango pe baza mwindu \n"
+      },
+      {
+        "id": "sna_51365",
+        "language": "sna",
+        "original_split": "train",
+        "transcription": "Chidhende chitsvuku chinoratidza kuti chakasungwa chikabaiwa netsono zvichiratidza kuti ndezvevaya vanoshereketa zvinoitwa nemapositori enguwo tsvuku kana kuti en`anga."
+      }
+    ]
+  },
+  "files": {
+    "sample_submission_columns": [
+      "ID",
+      "Target"
+    ],
+    "sample_submission_rows": 4253,
+    "test_columns": [
+      "ID"
+    ],
+    "test_rows": 4253,
+    "train_columns": [
+      "id",
+      "transcription",
+      "language",
+      "original_split"
+    ],
+    "train_rows": 38199
+  },
+  "language_distribution": {
+    "lin": 16244,
+    "lug": 6119,
+    "sna": 15836
+  },
+  "language_split_distribution": {
+    "lin": {
+      "train": 14400,
+      "validation": 1844
+    },
+    "lug": {
+      "train": 5455,
+      "validation": 664
+    },
+    "sna": {
+      "train": 14109,
+      "validation": 1727
+    }
+  },
+  "missing_values": {
+    "sample_submission": {
+      "ID": 0,
+      "Target": 0
+    },
+    "test": {
+      "ID": 0
+    },
+    "train": {
+      "id": 0,
+      "language": 0,
+      "original_split": 0,
+      "transcription": 0
+    }
+  },
+  "raw_dir": "/Users/sunbird/Downloads/google-waxal-asr-challenge20260630-10570-elxebu",
+  "sample_submission_alignment": {
+    "same_ids_same_order": true,
+    "sample_minus_test": [],
+    "test_minus_sample": []
+  },
+  "split_distribution": {
+    "train": 33964,
+    "validation": 4235
+  },
+  "test_prefix_distribution": {
+    "lin": 1866,
+    "lug": 638,
+    "sna": 1749
+  },
+  "text_quirks": {
+    "apostrophe_rows": 5958,
+    "digit_rows": 176,
+    "empty_after_strip_rows": 1,
+    "leading_trailing_whitespace_rows": 293,
+    "newline_rows": 686,
+    "non_ascii_rows": 1331,
+    "uppercase_rows": 34218
+  },
+  "train_test_id_overlap": {
+    "count": 0,
+    "examples": []
+  },
+  "transcription_length_stats": {
+    "lin": {
+      "chars": {
+        "max": 519,
+        "median": 146.0,
+        "min": 1,
+        "p95": 258
+      },
+      "words": {
+        "max": 102,
+        "median": 26.0,
+        "min": 0,
+        "p95": 48
+      }
+    },
+    "lug": {
+      "chars": {
+        "max": 650,
+        "median": 193,
+        "min": 42,
+        "p95": 371
+      },
+      "words": {
+        "max": 90,
+        "median": 27,
+        "min": 5,
+        "p95": 52
+      }
+    },
+    "sna": {
+      "chars": {
+        "max": 491,
+        "median": 186.0,
+        "min": 18,
+        "p95": 307
+      },
+      "words": {
+        "max": 59,
+        "median": 23.0,
+        "min": 3,
+        "p95": 38
+      }
+    }
+  },
+  "transcription_length_stats_by_split": {
+    "lin_train": {
+      "chars": {
+        "max": 519,
+        "median": 146.0,
+        "min": 1,
+        "p95": 257
+      },
+      "words": {
+        "max": 102,
+        "median": 26.0,
+        "min": 0,
+        "p95": 48
+      }
+    },
+    "lin_validation": {
+      "chars": {
+        "max": 438,
+        "median": 145.0,
+        "min": 17,
+        "p95": 258
+      },
+      "words": {
+        "max": 84,
+        "median": 26.0,
+        "min": 4,
+        "p95": 48
+      }
+    },
+    "lug_train": {
+      "chars": {
+        "max": 630,
+        "median": 193,
+        "min": 42,
+        "p95": 370
+      },
+      "words": {
+        "max": 90,
+        "median": 27,
+        "min": 5,
+        "p95": 52
+      }
+    },
+    "lug_validation": {
+      "chars": {
+        "max": 650,
+        "median": 195.0,
+        "min": 48,
+        "p95": 381
+      },
+      "words": {
+        "max": 86,
+        "median": 27.0,
+        "min": 6,
+        "p95": 52
+      }
+    },
+    "sna_train": {
+      "chars": {
+        "max": 491,
+        "median": 186,
+        "min": 18,
+        "p95": 307
+      },
+      "words": {
+        "max": 57,
+        "median": 23,
+        "min": 3,
+        "p95": 38
+      }
+    },
+    "sna_validation": {
+      "chars": {
+        "max": 457,
+        "median": 185,
+        "min": 46,
+        "p95": 305
+      },
+      "words": {
+        "max": 59,
+        "median": 22,
+        "min": 5,
+        "p95": 37
+      }
+    }
+  }
+}

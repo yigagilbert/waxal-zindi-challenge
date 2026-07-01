@@ -1,0 +1,14 @@
+{
+  "languages": [
+    "lin",
+    "sna",
+    "lug"
+  ],
+  "metadata_csvs": {
+    "test": "data/processed/test.csv",
+    "train": "data/processed/train.csv",
+    "validation": "data/processed/validation.csv"
+  },
+  "output_dir": "data/processed",
+  "raw_dir": "/Users/sunbird/Downloads/google-waxal-asr-challenge20260630-10570-elxebu"
+}

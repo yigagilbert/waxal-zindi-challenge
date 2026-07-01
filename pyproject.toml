@@ -1,0 +1,89 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "waxal-asr"
+version = "0.1.0"
+description = "Reproducible ASR training and inference pipeline for the Zindi Google WAXAL ASR Challenge."
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = { text = "MIT" }
+authors = [
+  { name = "WAXAL ASR Competition Team" }
+]
+dependencies = [
+  "accelerate>=1.0.0,<2",
+  "datasets[audio]>=3.0.0,<4",
+  "evaluate>=0.4.3,<0.5",
+  "jiwer>=3.0.4,<4",
+  "librosa>=0.10.2.post1,<0.12",
+  "numpy>=1.26,<2.3",
+  "packaging>=24.0",
+  "pandas>=2.2.0,<3",
+  "peft>=0.13.0,<0.20",
+  "psutil>=6.0.0",
+  "pyyaml>=6.0.2",
+  "safetensors>=0.4.5",
+  "soundfile>=0.12.1",
+  "torch>=2.6.0,<2.7",
+  "torchaudio>=2.6.0,<2.7",
+  "tqdm>=4.66.0",
+  "transformers>=4.46.0,<5",
+]
+
+[project.optional-dependencies]
+dev = [
+  "ruff>=0.8.0",
+  "pytest>=8.3.0",
+]
+training = [
+  "bitsandbytes>=0.44.0,<0.50; platform_system == 'Linux'",
+  "sentencepiece>=0.2.0",
+]
+notebook = [
+  "ipykernel>=6.29.0",
+  "ipywidgets>=8.1.0",
+  "jupyterlab>=4.2.0",
+]
+logging = [
+  "mlflow>=2.17.0",
+  "wandb>=0.18.0",
+]
+
+[dependency-groups]
+dev = [
+  "ruff>=0.8.0",
+  "pytest>=8.3.0",
+]
+training = [
+  "bitsandbytes>=0.44.0,<0.50; platform_system == 'Linux'",
+  "sentencepiece>=0.2.0",
+]
+notebook = [
+  "ipykernel>=6.29.0",
+  "ipywidgets>=8.1.0",
+  "jupyterlab>=4.2.0",
+]
+logging = [
+  "mlflow>=2.17.0",
+  "wandb>=0.18.0",
+]
+
+[project.scripts]
+waxal-audit = "waxal.cli:audit_data"
+waxal-prepare = "waxal.cli:prepare_dataset"
+waxal-check-gpu = "waxal.cli:check_gpu_env"
+waxal-evaluate = "waxal.cli:evaluate_predictions"
+waxal-submit = "waxal.cli:make_submission"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]

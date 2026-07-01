@@ -1,0 +1,6 @@
+# Legacy compatibility file.
+# Prefer:
+#   UV_TORCH_BACKEND=auto uv sync --locked --extra training
+#
+# For non-uv environments only:
+-e .[training]
