@@ -18,7 +18,7 @@ def load_split(dataset_dir: Path, split: str):
     try:
         from datasets import load_from_disk
     except ImportError as exc:
-        raise RuntimeError("datasets is required. Install requirements.txt first.") from exc
+        raise RuntimeError("datasets is required. Install with `uv sync` first.") from exc
     dataset_path = dataset_dir / "hf_dataset"
     dataset_dict = load_from_disk(dataset_path)
     if split not in dataset_dict:
@@ -44,7 +44,7 @@ def main() -> None:
         import torch
         from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
     except ImportError as exc:
-        raise RuntimeError("torch and transformers are required. Install requirements.txt first.") from exc
+        raise RuntimeError("torch and transformers are required. Install with `uv sync` first.") from exc
 
     ds = load_split(args.dataset_dir, args.split)
     if args.languages:
@@ -86,23 +86,23 @@ def main() -> None:
         )
         if "input_features" not in inputs:
             raise ValueError(f"Expected processor to return input_features, got keys: {list(inputs)}")
-        
+
         input_features = inputs["input_features"]
-        
+
         if input_features.shape[-1] != 3000:
             raise ValueError(
                 f"Whisper expects input_features length 3000, "
                 f"got shape {tuple(input_features.shape)}"
             )
-        
+
         model_dtype = next(model.parameters()).dtype
-        
+
         input_features = input_features.to(device=device, dtype=model_dtype)
-        
+
         attention_mask = inputs.get("attention_mask")
         if attention_mask is not None:
             attention_mask = attention_mask.to(device=device)
-        
+
         with torch.no_grad():
             generated = model.generate(
                 input_features=input_features,
@@ -122,4 +122,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -48,7 +48,7 @@ Do not commit `.env`, Hugging Face tokens, downloaded audio caches, checkpoints,
 
 ## GPU Setup
 
-See `docs/GPU_SETUP.md` for Vast.ai, Azure GPU VM, CUDA-enabled PyTorch, and local CPU/macOS setup.
+See `docs/GPU_SETUP.md` for Vast.ai, Azure GPU VM, CUDA-enabled PyTorch, and local CPU/macOS setup. See `docs/RESTART_RUNBOOK.md` for the RTX 5090/cu128 repair path and the staged restart sequence after an interrupted instance.
 
 Quick CUDA verification:
 
@@ -260,12 +260,13 @@ Follow `docs/EXPERIMENTS.md`. The short version:
 1. Audit data.
 2. Prepare metadata and a tiny audio smoke cache.
 3. Run the GPU environment check.
-4. Run `openai/whisper-large-v3-turbo` on tiny validation, then full validation.
+4. Prepare validation audio first, not full train/test.
 5. Run `Sunbird/asr-whisper-large-v3-salt` on Luganda validation.
-6. Compare per-language WER/CER under `raw`, `starter_lower`, and `language_safe`.
-7. Run XLS-R 300M smoke, then a real run if validation is sane.
-8. Run Whisper LoRA smoke, then a real run.
-9. Generate a test submission only after validation behavior is stable.
+6. Run `openai/whisper-large-v3-turbo` on all validation.
+7. Optionally run `openai/whisper-large-v3` on all validation.
+8. Compare per-language WER/CER under `raw`, `starter_lower`, and `language_safe`.
+9. Prepare train cache and smoke-test XLS-R 300M and Whisper LoRA.
+10. Prepare test and submit only after validation behavior is stable.
 
 ## Makefile Shortcuts
 
@@ -274,13 +275,19 @@ make audit
 make prepare-metadata
 make check-gpu
 make prepare-tiny
+make prepare-validation
+make sunbird-lug-validation
+make eval-sunbird-lug
+make whisper-turbo-validation
+make eval-whisper-turbo
 make whisper-tiny
-make eval
+make eval-tiny
 make xlsr-smoke
 make whisper-smoke
+make backup-artifacts
 ```
 
-All shortcuts call `uv run`.
+All shortcuts call `uv run`. Set `WAXAL_NO_SYNC=1` to use `uv run --no-sync` after a manual RTX 5090 torch repair.
 
 ## Project Layout
 

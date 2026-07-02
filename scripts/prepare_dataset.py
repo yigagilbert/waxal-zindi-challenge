@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -18,7 +19,6 @@ from waxal.data import (  # noqa: E402
     id_language,
     load_zindi_test,
     load_zindi_train,
-    split_rows,
     write_csv_rows,
 )
 from waxal.utils import json_dump  # noqa: E402
@@ -121,13 +121,14 @@ def prepare_hf_dataset(
     train_rows: list[dict[str, str]],
     test_rows: list[dict[str, str]],
     languages: list[str],
+    splits: list[str],
     sample_rate: int,
     output_dir: Path,
     streaming: bool,
     max_per_language_split: int | None,
 ) -> dict:
     """Prepare and save a local Hugging Face DatasetDict."""
-    from datasets import Audio, DatasetDict, concatenate_datasets, load_dataset
+    from datasets import Audio, DatasetDict, concatenate_datasets, load_dataset, load_from_disk
 
     csv_by_id = {row["id"]: row for row in train_rows}
     csv_by_id.update(
@@ -150,10 +151,11 @@ def prepare_hf_dataset(
         if lang in languages:
             zindi_ids_by_split_lang[("test", lang)].add(row["ID"])
 
-    prepared = {"train": [], "validation": [], "test": []}
-    report = {"splits": {}, "missing_ids": {}}
+    selected_splits = list(dict.fromkeys(splits))
+    prepared = {split_name: [] for split_name in selected_splits}
+    report = {"requested_splits": selected_splits, "splits": {}, "missing_ids": {}}
 
-    for split_name in ["train", "validation", "test"]:
+    for split_name in selected_splits:
         for lang in languages:
             ids = zindi_ids_by_split_lang[(split_name, lang)]
             if not ids:
@@ -209,8 +211,24 @@ def prepare_hf_dataset(
         if parts:
             dataset_dict[split_name] = concatenate_datasets(parts)
     out_path = output_dir / "hf_dataset"
-    dataset_dict.save_to_disk(out_path)
+    preserved_splits: list[str] = []
+    if out_path.exists():
+        existing = load_from_disk(out_path)
+        for split_name in existing:
+            if split_name not in dataset_dict:
+                dataset_dict[split_name] = existing[split_name]
+                preserved_splits.append(split_name)
+
+    tmp_path = output_dir / "hf_dataset.tmp"
+    if tmp_path.exists():
+        shutil.rmtree(tmp_path)
+    dataset_dict.save_to_disk(tmp_path)
+    if out_path.exists():
+        shutil.rmtree(out_path)
+    tmp_path.replace(out_path)
     report["dataset_path"] = str(out_path)
+    report["saved_splits"] = list(dataset_dict.keys())
+    report["preserved_splits"] = preserved_splits
     return report
 
 
@@ -219,6 +237,7 @@ def main() -> None:
     parser.add_argument("--raw-dir", type=Path, default=default_raw_dir())
     parser.add_argument("--output-dir", type=Path, default=Path("data/processed"))
     parser.add_argument("--languages", nargs="+", default=list(TARGET_LANGUAGES), choices=list(TARGET_LANGUAGES))
+    parser.add_argument("--splits", nargs="+", default=["train", "validation", "test"], choices=["train", "validation", "test"])
     parser.add_argument("--sample-rate", type=int, default=16_000)
     parser.add_argument("--metadata-only", action="store_true", help="Only write train/validation/test CSV metadata.")
     parser.add_argument("--streaming", action="store_true", help="Use streaming mode; requires max-per-language-split.")
@@ -248,6 +267,7 @@ def main() -> None:
             train_rows=train_rows,
             test_rows=test_rows,
             languages=args.languages,
+            splits=args.splits,
             sample_rate=args.sample_rate,
             output_dir=args.output_dir,
             streaming=args.streaming,

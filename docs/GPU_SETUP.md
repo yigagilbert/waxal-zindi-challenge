@@ -72,6 +72,7 @@ uv run scripts/check_gpu_env.py --raw-dir "$WAXAL_RAW_DIR" --require-gpu
 Recommended GPUs:
 
 - RTX 4090 24GB: cheap smoke tests, Whisper medium LoRA, XLS-R 300M experiments with careful batch sizes.
+- RTX 5090: viable but requires a CUDA 12.8 PyTorch build for `sm_120`; see `docs/RESTART_RUNBOOK.md` and use `uv run --no-sync` after manual torch repair.
 - A100 40GB/80GB: serious WAXAL training, Whisper large LoRA, XLS-R 1B, pseudo-label sweeps.
 - H100: final fast sweeps only if budget allows.
 

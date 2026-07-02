@@ -1,35 +1,14 @@
 # Experiment Runbook
 
-All commands use `uv run`. Do not run full training until the smoke sequence passes.
+All commands use `uv run` through the Makefile. On RTX 5090 after manual cu128 torch repair, prefix commands with `WAXAL_NO_SYNC=1`.
 
-## 1. Audit Data
-
-```bash
-uv run scripts/audit_data.py \
-  --raw-dir "$WAXAL_RAW_DIR" \
-  --output outputs/data_audit.json
-```
-
-## 2. Prepare Metadata Only
+## 1. GPU Environment Check
 
 ```bash
-uv run scripts/prepare_dataset.py \
-  --raw-dir "$WAXAL_RAW_DIR" \
-  --output-dir data/processed \
-  --metadata-only
+make restart-check
 ```
 
-## 3. Prepare Tiny Audio Cache
-
-```bash
-uv run scripts/prepare_dataset.py \
-  --raw-dir "$WAXAL_RAW_DIR" \
-  --output-dir data/processed_smoke \
-  --streaming \
-  --max-per-language-split 3
-```
-
-## 4. Run GPU Environment Check
+Use the direct command when debugging:
 
 ```bash
 uv run scripts/check_gpu_env.py \
@@ -37,61 +16,107 @@ uv run scripts/check_gpu_env.py \
   --require-gpu
 ```
 
-## 5. Run Whisper Turbo on Tiny Validation Cache
+## 2. Audit and Metadata
 
 ```bash
-uv run scripts/run_whisper_inference.py \
-  --model-name openai/whisper-large-v3-turbo \
-  --dataset-dir data/processed_smoke \
-  --split validation \
-  --max-samples 3 \
-  --output outputs/predictions/whisper_turbo_tiny_validation.csv
+make audit
+make prepare-metadata
 ```
 
-## 6. Run Whisper Turbo on Full Validation
+## 3. Tiny Smoke Cache
 
 ```bash
-uv run scripts/run_whisper_inference.py \
-  --model-name openai/whisper-large-v3-turbo \
-  --dataset-dir data/processed \
-  --split validation \
-  --output outputs/predictions/whisper_turbo_validation.csv
+make prepare-tiny
 ```
 
-## 7. Run Sunbird Whisper on Luganda Validation
+Run tiny Sunbird Luganda first:
 
 ```bash
-uv run scripts/run_whisper_inference.py \
-  --model-name Sunbird/asr-whisper-large-v3-salt \
-  --dataset-dir data/processed \
-  --split validation \
-  --languages lug \
-  --output outputs/predictions/sunbird_whisper_lug_validation.csv
+make sunbird-lug-tiny
+make eval-sunbird-lug-tiny
 ```
 
-## 8. Evaluate Normalization Policies
+Run tiny general Whisper:
+
+```bash
+make whisper-tiny
+make eval-tiny
+```
+
+Tiny predictions must be evaluated against `data/processed_smoke/validation.csv`.
+
+## 4. Prepare Validation First
+
+Do not prepare full train/test before baseline validation. Prepare only validation audio:
+
+```bash
+make prepare-validation
+```
+
+This writes or updates `data/processed/hf_dataset` while preserving any existing cached splits.
+
+## 5. Sunbird Luganda Expert Baseline
+
+```bash
+make sunbird-lug-validation
+make eval-sunbird-lug
+```
+
+This is first-class because Luganda is one of the WAXAL languages and `Sunbird/asr-whisper-large-v3-salt` is especially relevant for Luganda.
+
+## 6. General Whisper Turbo Baseline
+
+```bash
+make whisper-turbo-validation
+make eval-whisper-turbo
+```
+
+Use this for all-language comparison across Lingala, Shona, and Luganda.
+
+## 7. Optional Stronger General Whisper
+
+```bash
+make whisper-large-validation
+uv run scripts/evaluate_predictions.py \
+  --predictions outputs/predictions/whisper_large_v3_validation.csv \
+  --references data/processed/validation.csv \
+  --normalization all \
+  --output outputs/experiments/whisper_large_v3_validation_all_norms.json
+```
+
+Run this only if turbo results justify the extra inference time.
+
+## 8. Compare Normalization Policies
+
+For every validation prediction file, save all normalization metrics:
 
 ```bash
 uv run scripts/evaluate_predictions.py \
-  --predictions outputs/predictions/whisper_turbo_validation.csv \
+  --predictions outputs/predictions/<RUN_NAME>_validation.csv \
   --references data/processed/validation.csv \
   --normalization all \
-  --output outputs/experiments/whisper_turbo_validation_all_norms.json
+  --output outputs/experiments/<RUN_NAME>_all_norms.json
 ```
 
-## 9. Train XLS-R 300M Smoke Run
+Track overall weighted score, macro-by-language score, and each language separately.
+
+## 9. Prepare Train Cache
+
+Only after validation baselines are working:
 
 ```bash
-uv run scripts/train_xlsr_ctc.py \
-  --config configs/xlsr_300m.yaml \
-  --dataset-dir data/processed_smoke \
-  --max-train-samples 6 \
-  --max-eval-samples 3 \
-  --max-steps 2 \
-  --output-dir checkpoints/xlsr_300m_smoke
+make prepare-train
 ```
 
-## 10. Train XLS-R 300M Real Run
+## 10. Train XLS-R 300M Smoke Run
+
+```bash
+make xlsr-smoke
+```
+
+Proceed to a real XLS-R 300M run only if the smoke run creates a checkpoint and reports metrics.
+
+## 11. Train XLS-R 300M Real Run
 
 ```bash
 uv run scripts/train_xlsr_ctc.py \
@@ -109,19 +134,15 @@ uv run scripts/train_xlsr_ctc.py \
   --resume-from-checkpoint checkpoints/xlsr_300m_ctc_all/checkpoint-XXXX
 ```
 
-## 11. Train Whisper LoRA Smoke Run
+## 12. Train Whisper LoRA Smoke Run
 
 ```bash
-uv run scripts/train_whisper.py \
-  --config configs/whisper_medium_lora.yaml \
-  --dataset-dir data/processed_smoke \
-  --max-train-samples 3 \
-  --max-eval-samples 3 \
-  --max-steps 2 \
-  --output-dir checkpoints/whisper_medium_lora_smoke
+make whisper-smoke
 ```
 
-## 12. Train Whisper LoRA Real Run
+## 13. Train Whisper LoRA Real Runs
+
+All-language OpenAI Whisper:
 
 ```bash
 uv run scripts/train_whisper.py \
@@ -139,28 +160,13 @@ uv run scripts/train_whisper.py \
   --output-dir checkpoints/sunbird_whisper_lug_lora
 ```
 
-## 13. Create Validation Comparison Table
+## 14. Prepare Test Cache and Submit
 
-Evaluate each prediction file with all normalization policies:
+Prepare test only after validation is stable:
 
 ```bash
-uv run scripts/evaluate_predictions.py \
-  --predictions outputs/predictions/<PREDICTION_FILE>.csv \
-  --references data/processed/validation.csv \
-  --normalization all \
-  --output outputs/experiments/<RUN_NAME>_all_norms.json
+make prepare-test
 ```
-
-Track at minimum:
-
-- model name
-- checkpoint
-- normalization policy
-- overall WER/CER/combined
-- per-language WER/CER/combined
-- public leaderboard score only after local validation is stable
-
-## 14. Generate First Safe Test Submission
 
 Run test inference:
 
@@ -182,4 +188,3 @@ uv run scripts/make_submission.py \
 ```
 
 Do not submit until validation reports are saved under `outputs/experiments/`.
-
