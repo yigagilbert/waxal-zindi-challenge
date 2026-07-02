@@ -100,7 +100,7 @@ apt-get update
 apt-get install -y git curl ffmpeg
 curl -LsSf https://astral.sh/uv/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
-git clone <YOUR_REPO_URL> waxal-asr
+git clone https://github.com/yigagilbert/waxal-zindi-challenge.git waxal-asr
 cd waxal-asr
 export WAXAL_RAW_DIR=/workspace/data/google-waxal-asr-challenge20260630-10570-elxebu
 export HF_HOME=/workspace/.cache/huggingface

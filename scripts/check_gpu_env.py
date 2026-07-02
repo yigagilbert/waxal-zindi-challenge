@@ -102,13 +102,28 @@ def main() -> None:
         print(f"cuda available: {cuda_available}")
         print(f"torch cuda version: {torch.version.cuda}")
         if cuda_available:
+            arch_list = torch.cuda.get_arch_list() if hasattr(torch.cuda, "get_arch_list") else []
+            print(f"compiled cuda arch list: {arch_list or 'unknown'}")
             print(f"gpu count: {torch.cuda.device_count()}")
             for idx in range(torch.cuda.device_count()):
                 props = torch.cuda.get_device_properties(idx)
+                capability = f"sm_{props.major}{props.minor}"
                 print(
                     f"gpu[{idx}]: {torch.cuda.get_device_name(idx)} "
-                    f"({props.total_memory / (1024**3):.1f} GB)"
+                    f"({props.total_memory / (1024**3):.1f} GB, capability {capability})"
                 )
+                if arch_list and capability not in arch_list:
+                    failures.append(
+                        f"GPU {idx} has capability {capability}, but this torch build lists "
+                        f"{arch_list}. Install a PyTorch build that supports this GPU."
+                    )
+            try:
+                x = torch.randn((256, 256), device="cuda")
+                y = x @ x
+                torch.cuda.synchronize()
+                print(f"cuda matmul smoke: OK ({float(y.mean().detach().cpu()):.6f})")
+            except Exception as exc:
+                failures.append(f"CUDA matmul smoke failed: {type(exc).__name__}: {exc}")
         elif args.require_gpu:
             failures.append("CUDA GPU is required but torch.cuda.is_available() is False.")
 
@@ -164,4 +179,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

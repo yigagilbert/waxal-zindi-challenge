@@ -39,6 +39,8 @@ uv pip install --python .venv/bin/python --upgrade torch torchvision torchaudio 
 
 After repair, use `uv run --no-sync` or `WAXAL_NO_SYNC=1 make ...` so uv does not restore the locked torch version.
 
+`scripts/check_gpu_env.py` now checks the compiled CUDA architecture list and runs a real CUDA matmul smoke test. This catches the RTX 5090 failure before inference or training starts.
+
 ### Tiny Prediction Evaluation Caveat
 
 Tiny inference may generate only a few predictions. Evaluate those against the matching tiny reference file:
@@ -70,3 +72,7 @@ When `data/processed/hf_dataset` already exists, unrequested cached splits are p
 ### Per-Language Evaluation
 
 `scripts/evaluate_predictions.py` now supports `--languages`, so Luganda-only Sunbird predictions can be scored against Luganda references without reporting Lingala and Shona as missing.
+
+### Whisper LoRA PEFT Wrapper
+
+`scripts/train_whisper.py` no longer defaults LoRA to `task_type="SEQ_2_SEQ_LM"`. That PEFT wrapper sends `input_ids` into the model, but Whisper training uses `input_features`. The generic LoRA wrapper preserves Whisper's audio-input forward path.

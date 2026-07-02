@@ -121,7 +121,6 @@ def main() -> None:
             raise RuntimeError("peft is required for LoRA fine-tuning.") from exc
         lora_cfg = dict(config["lora"])
         lora_cfg.pop("enabled", None)
-        lora_cfg.setdefault("task_type", "SEQ_2_SEQ_LM")
         model.enable_input_require_grads()
         model = peft.get_peft_model(model, peft.LoraConfig(**lora_cfg))
         model.print_trainable_parameters()
