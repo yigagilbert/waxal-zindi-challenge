@@ -157,8 +157,12 @@ def main() -> None:
         processing_class=processor,
     )
     trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
-    metrics = trainer.evaluate()
-    print(metrics)
+    if config.get("evaluation", {}).get("skip_final_eval", False):
+        metrics = {"final_eval_skipped": True}
+        print("Final trainer.evaluate() skipped by config.")
+    else:
+        metrics = trainer.evaluate()
+        print(metrics)
 
     save_experiment_log(
         config.get("tracking", {}).get("local_dir", "outputs/experiments"),

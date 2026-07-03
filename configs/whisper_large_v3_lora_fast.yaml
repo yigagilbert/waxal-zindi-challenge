@@ -1,0 +1,41 @@
+run_name: whisper_large_v3_lora_fast_all
+model:
+  name: openai/whisper-large-v3
+data:
+  dataset_dir: data/processed
+  languages: null
+lora:
+  enabled: true
+  r: 16
+  lora_alpha: 32
+  target_modules:
+    - q_proj
+    - v_proj
+  lora_dropout: 0.05
+  bias: none
+evaluation:
+  normalization: starter_lower
+  skip_final_eval: true
+tracking:
+  report_to: none
+  local_dir: outputs/experiments
+training_args:
+  output_dir: checkpoints/whisper_large_v3_lora_fast_all
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 16
+  learning_rate: 1.0e-4
+  warmup_steps: 100
+  max_steps: 1500
+  gradient_checkpointing: true
+  fp16: true
+  eval_strategy: "no"
+  save_strategy: steps
+  predict_with_generate: false
+  generation_max_length: 256
+  save_steps: 250
+  logging_steps: 50
+  load_best_model_at_end: false
+  save_total_limit: 3
+  seed: 42
+  remove_unused_columns: false

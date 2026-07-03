@@ -76,3 +76,15 @@ When `data/processed/hf_dataset` already exists, unrequested cached splits are p
 ### Whisper LoRA PEFT Wrapper
 
 `scripts/train_whisper.py` no longer defaults LoRA to `task_type="SEQ_2_SEQ_LM"`. That PEFT wrapper sends `input_ids` into the model, but Whisper training uses `input_features`. The generic LoRA wrapper preserves Whisper's audio-input forward path.
+
+### LoRA Checkpoint Inference
+
+`scripts/run_whisper_inference.py` now supports PEFT adapter checkpoints:
+
+```bash
+uv run scripts/run_whisper_inference.py \
+  --model-name openai/whisper-large-v3 \
+  --adapter-path checkpoints/whisper_large_v3_lora_all/checkpoint-1500
+```
+
+If `--model-name` points directly to an adapter checkpoint, the script reads `adapter_config.json` and loads the recorded base model automatically.

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -26,9 +27,21 @@ def load_split(dataset_dir: Path, split: str):
     return dataset_dict[split]
 
 
+def adapter_base_model(adapter_path: Path) -> str | None:
+    """Read PEFT adapter base model from adapter_config.json, if present."""
+    config_path = adapter_path / "adapter_config.json"
+    if not config_path.exists():
+        return None
+    with config_path.open("r", encoding="utf-8") as f:
+        config = json.load(f)
+    return config.get("base_model_name_or_path")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-name", default="openai/whisper-large-v3-turbo")
+    parser.add_argument("--adapter-path", type=Path, default=None, help="Optional PEFT/LoRA adapter checkpoint.")
+    parser.add_argument("--merge-adapter", action="store_true", help="Merge PEFT adapter before inference.")
     parser.add_argument("--dataset-dir", type=Path, default=Path("data/processed"))
     parser.add_argument("--split", choices=["train", "validation", "test"], default="validation")
     parser.add_argument("--languages", nargs="*", default=None)
@@ -42,9 +55,10 @@ def main() -> None:
 
     try:
         import torch
+        from peft import PeftModel
         from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
     except ImportError as exc:
-        raise RuntimeError("torch and transformers are required. Install with `uv sync` first.") from exc
+        raise RuntimeError("torch, peft, and transformers are required. Install with `uv sync` first.") from exc
 
     ds = load_split(args.dataset_dir, args.split)
     if args.languages:
@@ -55,12 +69,32 @@ def main() -> None:
 
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
     torch_dtype = torch.float16 if device.startswith("cuda") else torch.float32
-    processor = AutoProcessor.from_pretrained(args.model_name)
+
+    model_name = args.model_name
+    adapter_path = args.adapter_path
+    model_path = Path(model_name)
+    if adapter_path is None and (model_path / "adapter_config.json").exists():
+        adapter_path = model_path
+        base_model = adapter_base_model(adapter_path)
+        if base_model:
+            model_name = base_model
+
+    processor_source = adapter_path or model_name
+    try:
+        processor = AutoProcessor.from_pretrained(processor_source)
+    except Exception:
+        processor = AutoProcessor.from_pretrained(model_name)
+
     model = AutoModelForSpeechSeq2Seq.from_pretrained(
-        args.model_name,
+        model_name,
         torch_dtype=torch_dtype,
         low_cpu_mem_usage=True,
-    ).to(device)
+    )
+    if adapter_path is not None:
+        model = PeftModel.from_pretrained(model, adapter_path)
+        if args.merge_adapter:
+            model = model.merge_and_unload()
+    model = model.to(device)
     model.eval()
     if hasattr(model.config, "forced_decoder_ids"):
         model.config.forced_decoder_ids = None
@@ -69,7 +103,8 @@ def main() -> None:
 
     output = args.output
     if output is None:
-        output = Path("outputs/predictions") / f"{clean_name(args.model_name)}_{args.split}.csv"
+        run_name = str(adapter_path) if adapter_path is not None else args.model_name
+        output = Path("outputs/predictions") / f"{clean_name(run_name)}_{args.split}.csv"
     output.parent.mkdir(parents=True, exist_ok=True)
 
     rows = []
