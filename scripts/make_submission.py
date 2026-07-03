@@ -21,6 +21,8 @@ def main() -> None:
     parser.add_argument("--model-name", default="model")
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--fill-missing", default="")
+    parser.add_argument("--empty-target", default=".")
+    parser.add_argument("--no-sanitize", action="store_true")
     args = parser.parse_args()
 
     output = args.output
@@ -34,6 +36,8 @@ def main() -> None:
         raw_dir=args.raw_dir,
         output_path=output,
         fill_missing=args.fill_missing,
+        sanitize=not args.no_sanitize,
+        empty_fallback=args.empty_target,
     )
     print(f"Wrote {result['num_rows']} rows to {result['output_path']}")
     if result["missing_predictions"]:
@@ -42,8 +46,13 @@ def main() -> None:
     if result["extra_predictions"]:
         print(f"WARNING: extra prediction IDs ignored: {len(result['extra_predictions'])}")
         print(result["extra_predictions"][:20])
+    if result["empty_targets_after_sanitize"]:
+        print(
+            "WARNING: empty targets remain after sanitization: "
+            f"{len(result['empty_targets_after_sanitize'])}"
+        )
+        print(result["empty_targets_after_sanitize"][:20])
 
 
 if __name__ == "__main__":
     main()
-

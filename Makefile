@@ -1,4 +1,4 @@
-.PHONY: audit prepare-metadata check-env check-gpu restart-check prepare-tiny prepare-validation prepare-train prepare-test whisper-tiny sunbird-lug-tiny eval eval-tiny eval-sunbird-lug-tiny sunbird-lug-validation whisper-turbo-validation whisper-large-validation eval-sunbird-lug eval-whisper-turbo xlsr-smoke whisper-smoke backup-artifacts clean-pyc
+.PHONY: audit prepare-metadata check-env check-gpu restart-check prepare-tiny prepare-validation prepare-train prepare-test prepare-test-fast whisper-tiny sunbird-lug-tiny eval eval-tiny eval-sunbird-lug-tiny sunbird-lug-validation whisper-turbo-validation whisper-large-validation eval-sunbird-lug eval-whisper-turbo audit-audio-train audit-audio-validation teacher-sunbird-lug-validation teacher-whisper-turbo-validation build-quality-buckets train-xlsr-clean-smoke train-xlsr-clean-all eval-xlsr-clean-all xlsr-smoke whisper-smoke backup-artifacts clean-pyc
 
 RAW_DIR ?= $(WAXAL_RAW_DIR)
 RAW_ARG := $(if $(RAW_DIR),--raw-dir "$(RAW_DIR)",)
@@ -7,6 +7,8 @@ SMOKE_DATASET_DIR ?= data/processed_smoke
 PREDICTIONS ?= outputs/predictions/whisper_tiny_validation.csv
 MODEL ?= openai/whisper-large-v3-turbo
 BACKUP_DIR ?= ../waxal_artifact_backup
+TEACHER_PREDICTIONS ?=
+XLSR_CLEAN_PREDICTIONS ?= outputs/predictions/xlsr_300m_balanced_clean_all_validation.csv
 UV_RUN := uv run $(if $(WAXAL_NO_SYNC),--no-sync,)
 
 audit:
@@ -34,6 +36,9 @@ prepare-train:
 
 prepare-test:
 	$(UV_RUN) scripts/prepare_dataset.py $(RAW_ARG) --output-dir "$(DATASET_DIR)" --splits test
+
+prepare-test-fast:
+	$(UV_RUN) scripts/prepare_dataset.py $(RAW_ARG) --output-dir "$(DATASET_DIR)" --splits test --skip-duration
 
 whisper-tiny:
 	$(UV_RUN) scripts/run_whisper_inference.py --model-name "$(MODEL)" --dataset-dir "$(SMOKE_DATASET_DIR)" --split validation --max-samples 3 --output "$(PREDICTIONS)"
@@ -63,6 +68,30 @@ eval-sunbird-lug:
 
 eval-whisper-turbo:
 	$(UV_RUN) scripts/evaluate_predictions.py --predictions outputs/predictions/whisper_turbo_validation.csv --references "$(DATASET_DIR)/validation.csv" --normalization all --output outputs/experiments/whisper_turbo_validation_all_norms.json
+
+audit-audio-train:
+	$(UV_RUN) scripts/audit_audio_quality.py --dataset-dir "$(DATASET_DIR)" --split train --output outputs/quality/audio_quality_train.csv
+
+audit-audio-validation:
+	$(UV_RUN) scripts/audit_audio_quality.py --dataset-dir "$(DATASET_DIR)" --split validation --output outputs/quality/audio_quality_validation.csv
+
+teacher-sunbird-lug-validation:
+	$(UV_RUN) scripts/run_teacher_inference.py --model-name "Sunbird/asr-whisper-large-v3-salt" --dataset-dir "$(DATASET_DIR)" --split validation --languages lug --output outputs/teachers/sunbird_whisper_lug_validation.csv
+
+teacher-whisper-turbo-validation:
+	$(UV_RUN) scripts/run_teacher_inference.py --model-name "openai/whisper-large-v3-turbo" --dataset-dir "$(DATASET_DIR)" --split validation --output outputs/teachers/whisper_turbo_validation.csv
+
+build-quality-buckets:
+	$(UV_RUN) scripts/build_quality_buckets.py --audio-quality outputs/quality/audio_quality_train.csv --metadata "$(DATASET_DIR)/train.csv" $(TEACHER_PREDICTIONS) --normalization language_safe --output-dir data/quality --summary-output outputs/quality/quality_bucket_summary.json
+
+train-xlsr-clean-smoke:
+	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_300m_balanced_clean_all.yaml --dataset-dir "$(DATASET_DIR)" --max-train-samples 12 --max-eval-samples 6 --max-steps 2 --output-dir checkpoints/xlsr_300m_balanced_clean_all_smoke
+
+train-xlsr-clean-all:
+	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_300m_balanced_clean_all.yaml --dataset-dir "$(DATASET_DIR)"
+
+eval-xlsr-clean-all:
+	$(UV_RUN) scripts/evaluate_predictions.py --predictions "$(XLSR_CLEAN_PREDICTIONS)" --references "$(DATASET_DIR)/validation.csv" --normalization all --output outputs/experiments/xlsr_300m_balanced_clean_all_validation_all_norms.json
 
 xlsr-smoke:
 	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_300m.yaml --dataset-dir "$(SMOKE_DATASET_DIR)" --max-train-samples 6 --max-eval-samples 3 --max-steps 2 --output-dir checkpoints/xlsr_300m_smoke

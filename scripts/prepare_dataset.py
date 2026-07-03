@@ -59,7 +59,14 @@ def metadata_rows(train_rows: list[dict[str, str]], test_rows: list[dict[str, st
     write_csv_rows(output_dir / "test.csv", test_meta, ["ID", "language", "original_split"])
 
 
-def attach_batch(batch, *, csv_by_id: dict[str, dict[str, str]], split_name: str, include_labels: bool):
+def attach_batch(
+    batch,
+    *,
+    csv_by_id: dict[str, dict[str, str]],
+    split_name: str,
+    include_labels: bool,
+    skip_duration: bool,
+):
     """Attach Zindi metadata to a Hugging Face batch without trusting HF test labels."""
     out = {
         "ID": [],
@@ -76,17 +83,29 @@ def attach_batch(batch, *, csv_by_id: dict[str, dict[str, str]], split_name: str
         out["ID"].append(example_id)
         out["language"].append(lang)
         out["original_split"].append(csv_row.get("original_split", split_name))
-        try:
-            array, sample_rate = audio_array_from_example(audio)
-            out["duration"].append(duration_seconds(array, sample_rate))
-        except Exception:
+        if skip_duration:
             out["duration"].append(None)
+        else:
+            try:
+                array, sample_rate = audio_array_from_example(audio)
+                out["duration"].append(duration_seconds(array, sample_rate))
+            except Exception:
+                out["duration"].append(None)
         if include_labels:
             out["transcription"].append(csv_row["transcription"])
     return out
 
 
-def collect_streaming_dataset(ds, *, ids: set[str], csv_by_id: dict[str, dict[str, str]], split_name: str, include_labels: bool, limit: int | None):
+def collect_streaming_dataset(
+    ds,
+    *,
+    ids: set[str],
+    csv_by_id: dict[str, dict[str, str]],
+    split_name: str,
+    include_labels: bool,
+    limit: int | None,
+    skip_duration: bool,
+):
     """Collect a small streaming subset into a regular Dataset."""
     from datasets import Dataset
 
@@ -105,11 +124,14 @@ def collect_streaming_dataset(ds, *, ids: set[str], csv_by_id: dict[str, dict[st
         }
         if include_labels:
             record["transcription"] = csv_row["transcription"]
-        try:
-            array, sample_rate = audio_array_from_example(example["audio"])
-            record["duration"] = duration_seconds(array, sample_rate)
-        except Exception:
+        if skip_duration:
             record["duration"] = None
+        else:
+            try:
+                array, sample_rate = audio_array_from_example(example["audio"])
+                record["duration"] = duration_seconds(array, sample_rate)
+            except Exception:
+                record["duration"] = None
         rows.append(record)
         if limit is not None and len(rows) >= limit:
             break
@@ -126,6 +148,7 @@ def prepare_hf_dataset(
     output_dir: Path,
     streaming: bool,
     max_per_language_split: int | None,
+    skip_duration: bool,
 ) -> dict:
     """Prepare and save a local Hugging Face DatasetDict."""
     from datasets import Audio, DatasetDict, concatenate_datasets, load_dataset, load_from_disk
@@ -172,8 +195,6 @@ def prepare_hf_dataset(
             include_labels = split_name != "test"
 
             if streaming:
-                if max_per_language_split is None:
-                    raise ValueError("--streaming requires --max-per-language-split for bounded local materialization")
                 filtered = collect_streaming_dataset(
                     ds,
                     ids=ids,
@@ -181,6 +202,7 @@ def prepare_hf_dataset(
                     split_name=split_name,
                     include_labels=include_labels,
                     limit=max_per_language_split,
+                    skip_duration=skip_duration,
                 )
                 seen = set(filtered["ID"]) if len(filtered) else set()
             else:
@@ -196,6 +218,7 @@ def prepare_hf_dataset(
                         "csv_by_id": csv_by_id,
                         "split_name": split_name,
                         "include_labels": include_labels,
+                        "skip_duration": skip_duration,
                     },
                     remove_columns=remove_columns,
                 )
@@ -242,6 +265,7 @@ def main() -> None:
     parser.add_argument("--metadata-only", action="store_true", help="Only write train/validation/test CSV metadata.")
     parser.add_argument("--streaming", action="store_true", help="Use streaming mode; requires max-per-language-split.")
     parser.add_argument("--max-per-language-split", type=int, default=None, help="Small subset limit for smoke tests.")
+    parser.add_argument("--skip-duration", action="store_true", help="Do not decode audio only to compute duration.")
     args = parser.parse_args()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -272,6 +296,7 @@ def main() -> None:
             output_dir=args.output_dir,
             streaming=args.streaming,
             max_per_language_split=args.max_per_language_split,
+            skip_duration=args.skip_duration,
         )
         report.update(hf_report)
 

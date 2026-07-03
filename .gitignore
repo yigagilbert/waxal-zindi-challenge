@@ -17,6 +17,12 @@ outputs/experiments/*
 !outputs/experiments/.gitkeep
 outputs/logs/*
 !outputs/logs/.gitkeep
+outputs/quality/*
+!outputs/quality/.gitkeep
+outputs/teachers/*
+!outputs/teachers/.gitkeep
+data/quality/*
+!data/quality/.gitkeep
 data/processed/hf_dataset/
 data/processed*/hf_dataset/
 data/processed_smoke/

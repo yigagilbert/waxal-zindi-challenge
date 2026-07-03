@@ -27,11 +27,16 @@ def load_split(dataset_dir: Path, split: str):
     return dataset_dict[split]
 
 
-def adapter_base_model(adapter_path: Path) -> str | None:
+def adapter_base_model(adapter_path: str) -> str | None:
     """Read PEFT adapter base model from adapter_config.json, if present."""
-    config_path = adapter_path / "adapter_config.json"
+    config_path = Path(adapter_path) / "adapter_config.json"
     if not config_path.exists():
-        return None
+        try:
+            from huggingface_hub import hf_hub_download
+
+            config_path = Path(hf_hub_download(repo_id=adapter_path, filename="adapter_config.json"))
+        except Exception:
+            return None
     with config_path.open("r", encoding="utf-8") as f:
         config = json.load(f)
     return config.get("base_model_name_or_path")
@@ -40,7 +45,7 @@ def adapter_base_model(adapter_path: Path) -> str | None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-name", default="openai/whisper-large-v3-turbo")
-    parser.add_argument("--adapter-path", type=Path, default=None, help="Optional PEFT/LoRA adapter checkpoint.")
+    parser.add_argument("--adapter-path", default=None, help="Optional local PEFT/LoRA checkpoint or Hugging Face repo ID.")
     parser.add_argument("--merge-adapter", action="store_true", help="Merge PEFT adapter before inference.")
     parser.add_argument("--dataset-dir", type=Path, default=Path("data/processed"))
     parser.add_argument("--split", choices=["train", "validation", "test"], default="validation")
@@ -74,7 +79,7 @@ def main() -> None:
     adapter_path = args.adapter_path
     model_path = Path(model_name)
     if adapter_path is None and (model_path / "adapter_config.json").exists():
-        adapter_path = model_path
+        adapter_path = str(model_path)
         base_model = adapter_base_model(adapter_path)
         if base_model:
             model_name = base_model
