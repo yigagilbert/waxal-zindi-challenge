@@ -32,6 +32,30 @@ Phase 1 is diagnostic and competition-safe:
 
 Sunbird is not used as a reason to train many separate models immediately. The first serious follow-up is still one multilingual XLS-R 300M model trained on clean official WAXAL examples.
 
+## Luganda Teacher Cleaning
+
+After the first audio-quality audit, Luganda needs special handling because many Luganda clips are longer than 30 seconds, and validation shows that long Luganda clips are part of the real distribution. A hard duration discard is too aggressive.
+
+The Luganda-only teacher-cleaning workflow is:
+
+1. Run Sunbird Whisper on Luganda train audio.
+2. Compare Sunbird predictions with original WAXAL Luganda labels under `no_punct_lower`.
+3. Keep original labels when Sunbird agrees.
+4. Replace labels only when Sunbird is plausible and disagreement is high, using `teacher-label-mode high_disagreement`.
+5. Write high-uncertainty examples to a review manifest instead of silently training on them.
+6. Keep Lingala and Shona from the existing clean WAXAL bucket.
+
+This is still official-WAXAL-only training: no external audio dataset is added. The pretrained Sunbird model is used as an openly available teacher on official WAXAL train audio.
+
+Key artifacts:
+
+- `outputs/teachers/sunbird_whisper_lug_train.csv`
+- `data/quality/lug_sunbird_clean_train.csv`
+- `data/quality/lug_sunbird_review_train.csv`
+- `data/quality/lug_sunbird_excluded_train.csv`
+- `data/quality/clean_train_sunbird_lug.csv`
+- `outputs/quality/luganda_teacher_cleaning_summary.json`
+
 ## Teacher Diagnostics
 
 Teacher outputs are used for:

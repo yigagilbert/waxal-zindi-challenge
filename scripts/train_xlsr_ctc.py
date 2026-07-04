@@ -43,10 +43,23 @@ class DataCollatorCTCWithPadding:
 def build_ctc_vocab(texts: list[str], output_dir: Path, normalization: str) -> Path:
     """Build and save a character-level CTC vocabulary."""
     chars = sorted({char for text in texts for char in normalize_text(text, normalization)})
-    vocab = {char: idx for idx, char in enumerate(chars) if char != " "}
-    vocab["|"] = len(vocab)
+    vocab: dict[str, int] = {}
+    for char in chars:
+        token = "|" if char == " " else char
+        if token not in vocab:
+            vocab[token] = len(vocab)
+    if "|" not in vocab:
+        vocab["|"] = len(vocab)
     vocab["[UNK]"] = len(vocab)
     vocab["[PAD]"] = len(vocab)
+    if len(set(vocab.values())) != len(vocab):
+        duplicates = {}
+        for token, token_id in vocab.items():
+            duplicates.setdefault(token_id, []).append(token)
+        duplicate_ids = {token_id: tokens for token_id, tokens in duplicates.items() if len(tokens) > 1}
+        raise ValueError(f"CTC vocabulary has duplicate token IDs: {duplicate_ids}")
+    if sorted(vocab.values()) != list(range(len(vocab))):
+        raise ValueError("CTC vocabulary IDs must be contiguous from 0 to len(vocab)-1.")
     out = output_dir / "vocab.json"
     with out.open("w", encoding="utf-8") as f:
         json.dump(vocab, f, ensure_ascii=False, indent=2, sort_keys=True)
@@ -266,13 +279,17 @@ def main() -> None:
             "ID": example["ID"],
         }
 
-    remove_columns = [c for c in train_ds.column_names if c not in {"language", "ID"}]
-    train_data = train_ds.map(prepare_example, remove_columns=remove_columns)
-    eval_data = eval_ds.map(prepare_example, remove_columns=remove_columns)
+    keep_columns = {"language", "ID"}
+    train_remove_columns = [c for c in train_ds.column_names if c not in keep_columns]
+    eval_remove_columns = [c for c in eval_ds.column_names if c not in keep_columns]
+    train_data = train_ds.map(prepare_example, remove_columns=train_remove_columns)
+    eval_data = eval_ds.map(prepare_example, remove_columns=eval_remove_columns)
 
     model = AutoModelForCTC.from_pretrained(
         model_name,
         ctc_loss_reduction="mean",
+        ctc_zero_infinity=True,
+        ignore_mismatched_sizes=True,
         pad_token_id=processor.tokenizer.pad_token_id,
         vocab_size=len(processor.tokenizer),
     )
@@ -288,8 +305,23 @@ def main() -> None:
         pred_ids = np.argmax(pred_logits, axis=-1)
         label_ids = eval_pred.label_ids
         label_ids[label_ids == -100] = processor.tokenizer.pad_token_id
-        pred_str = processor.batch_decode(pred_ids)
-        label_str = processor.batch_decode(label_ids, group_tokens=False)
+        word_delimiter = processor.tokenizer.word_delimiter_token or "|"
+        special_ids = set(processor.tokenizer.all_special_ids)
+
+        def clean_ctc_text(text: str) -> str:
+            return normalize_text(str(text).replace(word_delimiter, " "), "raw")
+
+        def decode_label_sequence(ids) -> str:
+            tokens = []
+            for token_id in ids:
+                token_id = int(token_id)
+                if token_id == processor.tokenizer.pad_token_id or token_id in special_ids:
+                    continue
+                tokens.append(processor.tokenizer.convert_ids_to_tokens(token_id))
+            return clean_ctc_text("".join(tokens))
+
+        pred_str = [clean_ctc_text(text) for text in processor.batch_decode(pred_ids)]
+        label_str = [decode_label_sequence(ids) for ids in label_ids]
         return compute_group_metrics(
             label_str,
             pred_str,

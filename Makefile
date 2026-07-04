@@ -1,4 +1,4 @@
-.PHONY: audit prepare-metadata check-env check-gpu restart-check prepare-tiny prepare-validation prepare-train prepare-test prepare-test-fast whisper-tiny sunbird-lug-tiny eval eval-tiny eval-sunbird-lug-tiny sunbird-lug-validation whisper-turbo-validation whisper-large-validation eval-sunbird-lug eval-whisper-turbo audit-audio-train audit-audio-validation teacher-sunbird-lug-validation teacher-whisper-turbo-validation build-quality-buckets train-xlsr-clean-smoke train-xlsr-clean-all eval-xlsr-clean-all xlsr-smoke whisper-smoke backup-artifacts clean-pyc
+.PHONY: audit prepare-metadata check-env check-gpu restart-check prepare-tiny prepare-validation prepare-train prepare-test prepare-test-fast whisper-tiny sunbird-lug-tiny eval eval-tiny eval-sunbird-lug-tiny sunbird-lug-validation whisper-turbo-validation whisper-large-validation eval-sunbird-lug eval-whisper-turbo audit-audio-train audit-audio-validation teacher-sunbird-lug-validation teacher-sunbird-lug-train teacher-whisper-turbo-validation build-quality-buckets clean-luganda-with-sunbird train-xlsr-clean-smoke train-xlsr-clean-all train-xlsr-sunbird-lug-smoke train-xlsr-sunbird-lug-all train-xlsr-sunbird-lug-v2-smoke train-xlsr-sunbird-lug-v2-all xlsr-sunbird-lug-validation eval-xlsr-sunbird-lug xlsr-sunbird-lug-v2-validation eval-xlsr-sunbird-lug-v2 eval-xlsr-clean-all xlsr-smoke whisper-smoke backup-artifacts clean-pyc
 
 RAW_DIR ?= $(WAXAL_RAW_DIR)
 RAW_ARG := $(if $(RAW_DIR),--raw-dir "$(RAW_DIR)",)
@@ -9,6 +9,10 @@ MODEL ?= openai/whisper-large-v3-turbo
 BACKUP_DIR ?= ../waxal_artifact_backup
 TEACHER_PREDICTIONS ?=
 XLSR_CLEAN_PREDICTIONS ?= outputs/predictions/xlsr_300m_balanced_clean_all_validation.csv
+XLSR_SUNBIRD_CHECKPOINT ?= checkpoints/xlsr_300m_balanced_sunbird_lug_all/checkpoint-6000
+XLSR_SUNBIRD_PREDICTIONS ?= outputs/predictions/xlsr_300m_balanced_sunbird_lug_checkpoint6000_validation.csv
+XLSR_SUNBIRD_V2_CHECKPOINT ?= checkpoints/xlsr_300m_balanced_sunbird_lug_all_v2/checkpoint-6000
+XLSR_SUNBIRD_V2_PREDICTIONS ?= outputs/predictions/xlsr_300m_balanced_sunbird_lug_v2_checkpoint6000_validation.csv
 UV_RUN := uv run $(if $(WAXAL_NO_SYNC),--no-sync,)
 
 audit:
@@ -78,17 +82,47 @@ audit-audio-validation:
 teacher-sunbird-lug-validation:
 	$(UV_RUN) scripts/run_teacher_inference.py --model-name "Sunbird/asr-whisper-large-v3-salt" --dataset-dir "$(DATASET_DIR)" --split validation --languages lug --output outputs/teachers/sunbird_whisper_lug_validation.csv
 
+teacher-sunbird-lug-train:
+	$(UV_RUN) scripts/run_teacher_inference.py --model-name "Sunbird/asr-whisper-large-v3-salt" --dataset-dir "$(DATASET_DIR)" --split train --languages lug --output outputs/teachers/sunbird_whisper_lug_train.csv
+
 teacher-whisper-turbo-validation:
 	$(UV_RUN) scripts/run_teacher_inference.py --model-name "openai/whisper-large-v3-turbo" --dataset-dir "$(DATASET_DIR)" --split validation --output outputs/teachers/whisper_turbo_validation.csv
 
 build-quality-buckets:
 	$(UV_RUN) scripts/build_quality_buckets.py --audio-quality outputs/quality/audio_quality_train.csv --metadata "$(DATASET_DIR)/train.csv" $(TEACHER_PREDICTIONS) --normalization language_safe --output-dir data/quality --summary-output outputs/quality/quality_bucket_summary.json
 
+clean-luganda-with-sunbird:
+	$(UV_RUN) scripts/clean_luganda_with_teacher.py --metadata "$(DATASET_DIR)/train.csv" --audio-quality outputs/quality/audio_quality_train.csv --teacher-predictions outputs/teachers/sunbird_whisper_lug_train.csv --base-clean-manifest data/quality/clean_train.csv --output-dir data/quality --summary-output outputs/quality/luganda_teacher_cleaning_summary.json --teacher-label-mode high_disagreement
+
 train-xlsr-clean-smoke:
 	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_300m_balanced_clean_all.yaml --dataset-dir "$(DATASET_DIR)" --max-train-samples 12 --max-eval-samples 6 --max-steps 2 --output-dir checkpoints/xlsr_300m_balanced_clean_all_smoke
 
 train-xlsr-clean-all:
 	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_300m_balanced_clean_all.yaml --dataset-dir "$(DATASET_DIR)"
+
+train-xlsr-sunbird-lug-smoke:
+	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_300m_balanced_sunbird_lug_all.yaml --dataset-dir "$(DATASET_DIR)" --max-train-samples 12 --max-eval-samples 6 --max-steps 2 --output-dir checkpoints/xlsr_300m_balanced_sunbird_lug_smoke
+
+train-xlsr-sunbird-lug-all:
+	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_300m_balanced_sunbird_lug_all.yaml --dataset-dir "$(DATASET_DIR)"
+
+train-xlsr-sunbird-lug-v2-smoke:
+	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_300m_balanced_sunbird_lug_all_v2.yaml --dataset-dir "$(DATASET_DIR)" --max-train-samples 12 --max-eval-samples 6 --max-steps 2 --output-dir checkpoints/xlsr_300m_balanced_sunbird_lug_v2_smoke
+
+train-xlsr-sunbird-lug-v2-all:
+	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_300m_balanced_sunbird_lug_all_v2.yaml --dataset-dir "$(DATASET_DIR)"
+
+xlsr-sunbird-lug-validation:
+	$(UV_RUN) scripts/run_xlsr_inference.py --checkpoint "$(XLSR_SUNBIRD_CHECKPOINT)" --dataset-dir "$(DATASET_DIR)" --split validation --batch-size 2 --output "$(XLSR_SUNBIRD_PREDICTIONS)"
+
+eval-xlsr-sunbird-lug:
+	$(UV_RUN) scripts/evaluate_predictions.py --predictions "$(XLSR_SUNBIRD_PREDICTIONS)" --references "$(DATASET_DIR)/validation.csv" --normalization all --output outputs/experiments/xlsr_300m_balanced_sunbird_lug_checkpoint6000_validation_all_norms.json
+
+xlsr-sunbird-lug-v2-validation:
+	$(UV_RUN) scripts/run_xlsr_inference.py --checkpoint "$(XLSR_SUNBIRD_V2_CHECKPOINT)" --dataset-dir "$(DATASET_DIR)" --split validation --batch-size 2 --output "$(XLSR_SUNBIRD_V2_PREDICTIONS)"
+
+eval-xlsr-sunbird-lug-v2:
+	$(UV_RUN) scripts/evaluate_predictions.py --predictions "$(XLSR_SUNBIRD_V2_PREDICTIONS)" --references "$(DATASET_DIR)/validation.csv" --normalization all --output outputs/experiments/xlsr_300m_balanced_sunbird_lug_v2_checkpoint6000_validation_all_norms.json
 
 eval-xlsr-clean-all:
 	$(UV_RUN) scripts/evaluate_predictions.py --predictions "$(XLSR_CLEAN_PREDICTIONS)" --references "$(DATASET_DIR)/validation.csv" --normalization all --output outputs/experiments/xlsr_300m_balanced_clean_all_validation_all_norms.json
