@@ -1,0 +1,41 @@
+run_name: xlsr_300m_alvin_lingala_waxal_finetune
+model:
+  name: Alvin-Nahabwe/wav2vec2-xls-r-300m-Fleurs_AMMI_AFRIVOICE_LRSC-ln-109hrs-v2
+  freeze_feature_encoder: true
+data:
+  dataset_dir: data/processed
+  train_manifest: data/quality/clean_train_alvin_lingala_v1.csv
+  include_medium: false
+  languages:
+    - lin
+  min_duration: 0.30
+  max_duration: 50.0
+  language_balanced_sampling: false
+text:
+  normalization: language_safe
+evaluation:
+  normalization: language_safe
+tracking:
+  report_to: none
+  local_dir: outputs/experiments
+training_args:
+  output_dir: checkpoints/xlsr_300m_alvin_lingala_waxal_finetune
+  per_device_train_batch_size: 2
+  per_device_eval_batch_size: 2
+  gradient_accumulation_steps: 8
+  learning_rate: 1.0e-4
+  warmup_steps: 300
+  max_steps: 2500
+  fp16: true
+  gradient_checkpointing: true
+  eval_strategy: steps
+  save_strategy: steps
+  save_steps: 250
+  eval_steps: 250
+  logging_steps: 50
+  save_total_limit: 3
+  seed: 42
+  group_by_length: true
+  load_best_model_at_end: true
+  metric_for_best_model: eval_cer
+  greater_is_better: false

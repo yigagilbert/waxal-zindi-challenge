@@ -92,6 +92,41 @@ Teacher outputs are not used for:
    - Sunbird Luganda validation baseline.
 9. Only after the multilingual clean XLS-R result is known, decide whether to run per-language models.
 
+## Lingala Recovery Update
+
+After the XLS-R v2 submission, the main weakness is Lingala rather than Luganda. The public score is consistent with local validation once interpreted as:
+
+```text
+zindi_score = 1 - 0.5 * (WER + CER)
+```
+
+So the next strategy is not to restart from scratch. It is to recover Lingala.
+
+Highest-priority Lingala model:
+
+```text
+Alvin-Nahabwe/wav2vec2-xls-r-300m-Fleurs_AMMI_AFRIVOICE_LRSC-ln-109hrs-v2
+```
+
+This model should be evaluated before any new full WAXAL training run because:
+
+- it is an actual Lingala ASR model,
+- it uses the same XLS-R 300M family as our current best model,
+- it is reported as Apache-2.0,
+- it is likely more useful for Lingala than generic Whisper or text-only correction.
+
+New Lingala execution order:
+
+1. Confirm Alvin model access with `make alvin-lingala-access`.
+2. Run Alvin on WAXAL Lingala validation.
+3. Compare Alvin against checkpoint-6000 on Lingala validation.
+4. Run Alvin on WAXAL Lingala train as a teacher.
+5. Build `data/quality/clean_train_alvin_lingala_v1.csv`.
+6. Run Alvin on WAXAL Lingala test for sanity comparison.
+7. Decide between direct routing, Alvin-initialized fine-tuning, or Alvin-assisted filtering.
+
+Do not start external Lingala training until `KasuleTrevor/Lingala_100hrs` and source-level licenses are audited.
+
 ## Expected Artifacts
 
 Audio quality:

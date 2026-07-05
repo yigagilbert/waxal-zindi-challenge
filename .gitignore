@@ -21,6 +21,8 @@ outputs/quality/*
 !outputs/quality/.gitkeep
 outputs/teachers/*
 !outputs/teachers/.gitkeep
+outputs/analysis/*
+!outputs/analysis/.gitkeep
 data/quality/*
 !data/quality/.gitkeep
 data/processed/hf_dataset/
