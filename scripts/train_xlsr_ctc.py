@@ -24,9 +24,11 @@ class DataCollatorCTCWithPadding:
     """Pad CTC audio inputs and labels separately."""
 
     processor: Any
+    normalization: str = "language_safe"
     padding: bool | str = True
 
     def __call__(self, features):
+        features = [self._prepare_feature(feature) for feature in features]
         input_features = [{"input_values": feature["input_values"]} for feature in features]
         label_features = [{"input_ids": feature["labels"]} for feature in features]
         batch = self.processor.pad(input_features, padding=self.padding, return_tensors="pt")
@@ -38,6 +40,22 @@ class DataCollatorCTCWithPadding:
         labels = labels_batch["input_ids"].masked_fill(labels_batch.attention_mask.ne(1), -100)
         batch["labels"] = labels
         return batch
+
+    def _prepare_feature(self, feature):
+        """Create CTC features lazily to avoid writing huge audio arrays to disk."""
+        if "input_values" in feature and "labels" in feature:
+            return feature
+        audio = feature["audio"]
+        inputs = self.processor(audio["array"], sampling_rate=16_000)
+        labels = self.processor.tokenizer(
+            normalize_text(feature["transcription"], self.normalization)
+        ).input_ids
+        return {
+            "input_values": inputs.input_values[0],
+            "labels": labels,
+            "language": feature.get("language", ""),
+            "ID": feature.get("ID", ""),
+        }
 
 
 def build_ctc_vocab(texts: list[str], output_dir: Path, normalization: str) -> Path:
@@ -115,20 +133,19 @@ def apply_train_manifest(train_ds, manifest_rows: list[dict[str, str]]):
     """Filter a prepared train split to manifest IDs and attach manifest labels."""
     manifest_by_id = {row["ID"]: row for row in manifest_rows}
     wanted = set(manifest_by_id)
-    filtered = train_ds.filter(lambda row, ids=wanted: row["ID"] in ids)
+    filtered = train_ds.filter(lambda row_id, ids=wanted: row_id in ids, input_columns=["ID"])
     found = set(filtered["ID"]) if len(filtered) else set()
     missing = sorted(wanted - found)
     if missing:
         print(f"WARNING: {len(missing)} manifest IDs were not found in the prepared train split. First examples: {missing[:10]}")
 
-    def attach_manifest_label(example):
-        manifest_row = manifest_by_id[example["ID"]]
+    def attach_manifest_label(ids):
         return {
-            "transcription": manifest_row["Target"],
-            "quality_bucket": manifest_row.get("quality_bucket", ""),
+            "transcription": [manifest_by_id[row_id]["Target"] for row_id in ids],
+            "quality_bucket": [manifest_by_id[row_id].get("quality_bucket", "") for row_id in ids],
         }
 
-    return filtered.map(attach_manifest_label)
+    return filtered.map(attach_manifest_label, batched=True, input_columns=["ID"])
 
 
 def filter_duration(ds, *, min_duration: float | None, max_duration: float | None):
@@ -139,9 +156,8 @@ def filter_duration(ds, *, min_duration: float | None, max_duration: float | Non
         print("Duration filtering requested but dataset has no duration column; keeping all examples.")
         return ds
 
-    def keep(row):
-        duration = row.get("duration")
-        if duration is None:
+    def keep(duration):
+        if duration is None or duration < 0:
             return True
         if min_duration is not None and duration < min_duration:
             return False
@@ -149,7 +165,7 @@ def filter_duration(ds, *, min_duration: float | None, max_duration: float | Non
             return False
         return True
 
-    return ds.filter(keep)
+    return ds.filter(keep, input_columns=["duration"])
 
 
 def balance_by_language(ds, *, seed: int):
@@ -218,8 +234,8 @@ def main() -> None:
     languages = data_config.get("languages")
     if languages:
         language_set = set(languages)
-        train_ds = train_ds.filter(lambda row: row["language"] in language_set)
-        eval_ds = eval_ds.filter(lambda row: row["language"] in language_set)
+        train_ds = train_ds.filter(lambda language: language in language_set, input_columns=["language"])
+        eval_ds = eval_ds.filter(lambda language: language in language_set, input_columns=["language"])
 
     train_manifest = args.train_manifest or data_config.get("train_manifest")
     include_medium = args.include_medium
@@ -268,22 +284,28 @@ def main() -> None:
     )
     processor = Wav2Vec2Processor(feature_extractor=feature_extractor, tokenizer=tokenizer)
 
-    def prepare_example(example):
-        audio = example["audio"]
-        inputs = processor(audio["array"], sampling_rate=16_000)
-        labels = processor.tokenizer(normalize_text(example["transcription"], normalization)).input_ids
-        return {
-            "input_values": inputs.input_values[0],
-            "labels": labels,
-            "language": example["language"],
-            "ID": example["ID"],
-        }
+    lazy_preprocessing = bool(data_config.get("lazy_preprocessing", True))
+    if lazy_preprocessing:
+        train_data = train_ds
+        eval_data = eval_ds
+        print("Using lazy audio preprocessing in the CTC data collator; no feature cache will be written.")
+    else:
+        def prepare_example(example):
+            audio = example["audio"]
+            inputs = processor(audio["array"], sampling_rate=16_000)
+            labels = processor.tokenizer(normalize_text(example["transcription"], normalization)).input_ids
+            return {
+                "input_values": inputs.input_values[0],
+                "labels": labels,
+                "language": example["language"],
+                "ID": example["ID"],
+            }
 
-    keep_columns = {"language", "ID"}
-    train_remove_columns = [c for c in train_ds.column_names if c not in keep_columns]
-    eval_remove_columns = [c for c in eval_ds.column_names if c not in keep_columns]
-    train_data = train_ds.map(prepare_example, remove_columns=train_remove_columns)
-    eval_data = eval_ds.map(prepare_example, remove_columns=eval_remove_columns)
+        keep_columns = {"language", "ID"}
+        train_remove_columns = [c for c in train_ds.column_names if c not in keep_columns]
+        eval_remove_columns = [c for c in eval_ds.column_names if c not in keep_columns]
+        train_data = train_ds.map(prepare_example, remove_columns=train_remove_columns)
+        eval_data = eval_ds.map(prepare_example, remove_columns=eval_remove_columns)
 
     model = AutoModelForCTC.from_pretrained(
         model_name,
@@ -296,7 +318,7 @@ def main() -> None:
     if config.get("model", {}).get("freeze_feature_encoder", True):
         model.freeze_feature_encoder()
 
-    data_collator = DataCollatorCTCWithPadding(processor=processor)
+    data_collator = DataCollatorCTCWithPadding(processor=processor, normalization=normalization)
 
     def compute_metrics(eval_pred):
         import numpy as np
@@ -331,6 +353,11 @@ def main() -> None:
     training_kwargs = dict(config["training_args"])
     training_kwargs["push_to_hub"] = False
     training_kwargs["report_to"] = config.get("tracking", {}).get("report_to", "none")
+    if lazy_preprocessing:
+        training_kwargs["remove_unused_columns"] = False
+        if training_kwargs.get("group_by_length"):
+            print("Disabling group_by_length because lazy preprocessing has no cached input_values column.")
+            training_kwargs["group_by_length"] = False
     training_args = TrainingArguments(**training_kwargs)
     trainer = Trainer(
         model=model,

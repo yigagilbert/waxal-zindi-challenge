@@ -13,6 +13,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from waxal.data import TARGET_LANGUAGES  # noqa: E402
+from waxal.text_normalization import normalize_text  # noqa: E402
 from waxal.utils import json_dump  # noqa: E402
 
 
@@ -92,8 +93,10 @@ def run_ctc_check(args: argparse.Namespace, ds) -> tuple[dict[str, Any], list[di
         raise_with_token_hint("processor/tokenizer download", exc)
     status["steps"]["processor_download"] = "ok"
     tokenizer = getattr(processor, "tokenizer", None)
+    status["processor_class"] = processor.__class__.__name__
     status["tokenizer_class"] = tokenizer.__class__.__name__ if tokenizer is not None else ""
     status["word_delimiter_token"] = getattr(tokenizer, "word_delimiter_token", None)
+    status["has_lm_decoder"] = hasattr(processor, "decoder")
 
     try:
         model = AutoModelForCTC.from_pretrained(args.model_name).to(device)
@@ -117,10 +120,30 @@ def run_ctc_check(args: argparse.Namespace, ds) -> tuple[dict[str, Any], list[di
         with torch.no_grad():
             logits = model(**inputs).logits
         pred_ids = torch.argmax(logits, dim=-1)
-        text = processor.batch_decode(pred_ids)[0].strip()
+        text = decode_ctc_batch(
+            processor,
+            logits,
+            pred_ids,
+            getattr(tokenizer, "word_delimiter_token", None),
+        )[0]
         rows.append({"ID": example["ID"], "Target": text, "language": example["language"]})
     status["steps"]["inference"] = "ok"
     return status, rows
+
+
+def clean_ctc_text(text: str, word_delimiter: str | None) -> str:
+    delimiter = word_delimiter or "|"
+    return normalize_text(str(text).replace(delimiter, " "), "raw")
+
+
+def decode_ctc_batch(processor, logits, pred_ids, word_delimiter: str | None) -> list[str]:
+    """Decode CTC outputs for both plain and LM-backed Wav2Vec2 processors."""
+    if hasattr(processor, "decoder"):
+        decoded = processor.batch_decode(logits.detach().float().cpu().numpy())
+        texts = decoded.text if hasattr(decoded, "text") else decoded["text"]
+    else:
+        texts = processor.batch_decode(pred_ids)
+    return [clean_ctc_text(text, word_delimiter) for text in texts]
 
 
 def run_whisper_check(args: argparse.Namespace, ds) -> tuple[dict[str, Any], list[dict[str, str]]]:

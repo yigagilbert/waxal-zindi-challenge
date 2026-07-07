@@ -82,6 +82,26 @@ Do not train on `KasuleTrevor/Lingala_100hrs` until:
 4. its validation/test split is not accidentally derived from WAXAL Phase 1 hidden labels,
 5. source domains are understood well enough to set a safe sampling ratio.
 
+## Sampled Audit Result
+
+The first streaming audit sampled 500 rows per split.
+
+| Split | Rows Seen | Sources | Empty Text | Duplicate Texts |
+|---|---:|---|---:|---:|
+| train | 500 | Afrivoice 371, LRSC 67, fleurs 62 | 0 | 0 |
+| validation | 500 | Afrivoice 500 | 0 | 0 |
+| test | 500 | Afrivoice 485, LRSC 15 | 0 | 0 |
+
+Other sampled-audit findings:
+
+- dataset-info license field was empty,
+- dataset description was not present,
+- possible text overlap with WAXAL Lingala train: `243`,
+- possible WAXAL test ID overlap: `0`,
+- unusual character counts: none in the sampled rows.
+
+Decision remains: do not train on this dataset in the immediate next run. It may be valuable later, but needs license and leakage sign-off first.
+
 ## Likely Use If Approved
 
 Preferred order:

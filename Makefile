@@ -1,9 +1,10 @@
-.PHONY: audit prepare-metadata check-env check-gpu restart-check prepare-tiny prepare-validation prepare-train prepare-test prepare-test-fast whisper-tiny sunbird-lug-tiny eval eval-tiny eval-sunbird-lug-tiny sunbird-lug-validation whisper-turbo-validation whisper-large-validation eval-sunbird-lug eval-whisper-turbo audit-audio-train audit-audio-validation teacher-sunbird-lug-validation teacher-sunbird-lug-train teacher-whisper-turbo-validation build-quality-buckets clean-luganda-with-sunbird train-xlsr-clean-smoke train-xlsr-clean-all train-xlsr-sunbird-lug-smoke train-xlsr-sunbird-lug-all train-xlsr-sunbird-lug-v2-smoke train-xlsr-sunbird-lug-v2-all xlsr-sunbird-lug-validation eval-xlsr-sunbird-lug xlsr-sunbird-lug-v2-validation eval-xlsr-sunbird-lug-v2 xlsr-v2-validation-all analyze-xlsr-v2-validation-all xlsr-v2-test-all analyze-xlsr-v2-test-all submissions-xlsr-v2-all alvin-lingala-access alvin-lingala-validation compare-alvin-lingala-validation alvin-lingala-train-teacher lingala-alvin-diagnostics build-lingala-alvin-manifest alvin-lingala-test compare-alvin-lingala-test audit-lingala-100hrs train-alvin-lingala-smoke train-alvin-lingala eval-xlsr-clean-all xlsr-smoke whisper-smoke backup-artifacts clean-pyc
+.PHONY: audit prepare-metadata check-env check-gpu restart-check prepare-tiny prepare-validation prepare-train prepare-test prepare-test-fast whisper-tiny sunbird-lug-tiny eval eval-tiny eval-sunbird-lug-tiny sunbird-lug-validation whisper-turbo-validation whisper-large-validation eval-sunbird-lug eval-whisper-turbo audit-audio-train audit-audio-validation teacher-sunbird-lug-validation teacher-sunbird-lug-train teacher-whisper-turbo-validation build-quality-buckets clean-luganda-with-sunbird train-xlsr-clean-smoke train-xlsr-clean-all train-xlsr-sunbird-lug-smoke train-xlsr-sunbird-lug-all train-xlsr-sunbird-lug-v2-smoke train-xlsr-sunbird-lug-v2-all xlsr-sunbird-lug-validation eval-xlsr-sunbird-lug xlsr-sunbird-lug-v2-validation eval-xlsr-sunbird-lug-v2 xlsr-v2-validation-all analyze-xlsr-v2-validation-all xlsr-v2-test-all analyze-xlsr-v2-test-all submissions-xlsr-v2-all alvin-lingala-access alvin-lingala-validation compare-alvin-lingala-validation alvin-lingala-train-teacher lingala-alvin-diagnostics build-lingala-alvin-manifest alvin-lingala-test compare-alvin-lingala-test audit-lingala-100hrs train-alvin-lingala-smoke train-alvin-lingala train-xlsr-alvin-lingala-all-smoke train-xlsr-alvin-lingala-all xlsr-alvin-lingala-all-validation eval-xlsr-alvin-lingala-all analyze-xlsr-alvin-lingala-all-validation xlsr-alvin-lingala-all-test analyze-xlsr-alvin-lingala-all-test submission-xlsr-alvin-lingala-all prepare-generalization-mix-safe prepare-generalization-mix-all train-xlsr-generalization-mix-smoke train-xlsr-generalization-mix xlsr-generalization-mix-validation eval-xlsr-generalization-mix analyze-xlsr-generalization-mix-validation xlsr-generalization-mix-test analyze-xlsr-generalization-mix-test submission-xlsr-generalization-mix eval-xlsr-clean-all xlsr-smoke whisper-smoke backup-artifacts clean-pyc
 
 RAW_DIR ?= $(WAXAL_RAW_DIR)
 RAW_ARG := $(if $(RAW_DIR),--raw-dir "$(RAW_DIR)",)
 DATASET_DIR ?= data/processed
 SMOKE_DATASET_DIR ?= data/processed_smoke
+GENERALIZATION_DATASET_DIR ?= data/processed_generalization_mix
 PREDICTIONS ?= outputs/predictions/whisper_tiny_validation.csv
 MODEL ?= openai/whisper-large-v3-turbo
 BACKUP_DIR ?= ../waxal_artifact_backup
@@ -26,6 +27,20 @@ BRAINTHEOS_LINGALA_MODEL ?= BrainTheos/wav2vec2-large-mms-1b-all-lingala-ojpl
 ALVIN_LINGALA_VALID ?= outputs/lingala_models/alvin_xlsr_lingala_validation.csv
 ALVIN_LINGALA_TEST ?= outputs/lingala_models/alvin_xlsr_lingala_test.csv
 ALVIN_LINGALA_TRAIN ?= outputs/lingala_models/alvin_xlsr_lingala_train.csv
+XLSR_ALVIN_LINGALA_ALL_BASE ?= checkpoints/xlsr_300m_balanced_alvin_lingala_all
+XLSR_ALVIN_LINGALA_ALL_CHECKPOINT ?= $(XLSR_ALVIN_LINGALA_ALL_BASE)/checkpoint-6000
+XLSR_ALVIN_LINGALA_ALL_VALID ?= outputs/predictions/xlsr_300m_balanced_alvin_lingala_checkpoint6000_validation.csv
+XLSR_ALVIN_LINGALA_ALL_TEST ?= outputs/predictions/xlsr_300m_balanced_alvin_lingala_checkpoint6000_test.csv
+XLSR_GENERALIZATION_MIX_BASE ?= checkpoints/xlsr_300m_generalization_mix
+XLSR_GENERALIZATION_MIX_CHECKPOINT ?= $(XLSR_GENERALIZATION_MIX_BASE)/checkpoint-8000
+XLSR_GENERALIZATION_MIX_VALID ?= outputs/predictions/xlsr_300m_generalization_mix_checkpoint8000_validation.csv
+XLSR_GENERALIZATION_MIX_TEST ?= outputs/predictions/xlsr_300m_generalization_mix_checkpoint8000_test.csv
+FLEURS_MAX_PER_LANGUAGE ?=
+SALT_MAX ?=
+LINGALA_100HRS_MAX ?=
+FLEURS_MAX_ARG := $(if $(FLEURS_MAX_PER_LANGUAGE),--fleurs-max-per-language "$(FLEURS_MAX_PER_LANGUAGE)",)
+SALT_MAX_ARG := $(if $(SALT_MAX),--salt-max "$(SALT_MAX)",)
+LINGALA_100HRS_MAX_ARG := $(if $(LINGALA_100HRS_MAX),--lingala-100hrs-max "$(LINGALA_100HRS_MAX)",)
 UV_RUN := uv run $(if $(WAXAL_NO_SYNC),--no-sync,)
 
 audit:
@@ -190,6 +205,60 @@ train-alvin-lingala-smoke:
 
 train-alvin-lingala:
 	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_300m_alvin_lingala_waxal_finetune.yaml --dataset-dir "$(DATASET_DIR)"
+
+train-xlsr-alvin-lingala-all-smoke:
+	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_300m_balanced_alvin_lingala_all.yaml --dataset-dir "$(DATASET_DIR)" --max-train-samples 12 --max-eval-samples 6 --max-steps 2 --output-dir checkpoints/xlsr_300m_balanced_alvin_lingala_smoke
+
+train-xlsr-alvin-lingala-all:
+	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_300m_balanced_alvin_lingala_all.yaml --dataset-dir "$(DATASET_DIR)"
+
+xlsr-alvin-lingala-all-validation:
+	$(UV_RUN) scripts/run_xlsr_inference.py --checkpoint "$(XLSR_ALVIN_LINGALA_ALL_CHECKPOINT)" --dataset-dir "$(DATASET_DIR)" --split validation --batch-size 2 --output "$(XLSR_ALVIN_LINGALA_ALL_VALID)"
+
+eval-xlsr-alvin-lingala-all:
+	$(UV_RUN) scripts/evaluate_predictions.py --predictions "$(XLSR_ALVIN_LINGALA_ALL_VALID)" --references "$(DATASET_DIR)/validation.csv" --normalization all --output outputs/experiments/xlsr_300m_balanced_alvin_lingala_checkpoint6000_validation_all_norms.json
+
+analyze-xlsr-alvin-lingala-all-validation:
+	$(UV_RUN) scripts/analyze_prediction_distributions.py --predictions "$(XLSR_V2_CKPT6000_VALID)" "$(XLSR_ALVIN_LINGALA_ALL_VALID)" --names xlsr_v2_ckpt6000 xlsr_alvin_lingala_all --references "$(DATASET_DIR)/validation.csv" --normalization all --output outputs/analysis/xlsr_alvin_lingala_all_vs_v2_validation.json
+
+xlsr-alvin-lingala-all-test:
+	$(UV_RUN) scripts/run_xlsr_inference.py --checkpoint "$(XLSR_ALVIN_LINGALA_ALL_CHECKPOINT)" --dataset-dir "$(DATASET_DIR)" --split test --batch-size 2 --output "$(XLSR_ALVIN_LINGALA_ALL_TEST)"
+
+analyze-xlsr-alvin-lingala-all-test:
+	$(UV_RUN) scripts/analyze_prediction_distributions.py --predictions "$(XLSR_V2_CKPT6000_TEST)" "$(XLSR_ALVIN_LINGALA_ALL_TEST)" --names xlsr_v2_ckpt6000 xlsr_alvin_lingala_all --output outputs/analysis/xlsr_alvin_lingala_all_vs_v2_test.json
+
+submission-xlsr-alvin-lingala-all:
+	$(UV_RUN) scripts/make_submission.py --predictions "$(XLSR_ALVIN_LINGALA_ALL_TEST)" $(RAW_ARG) --model-name xlsr_alvin_lingala_all --output outputs/submissions/submission_xlsr_alvin_lingala_all.csv
+
+prepare-generalization-mix-safe:
+	$(UV_RUN) scripts/prepare_generalization_mix.py --waxal-dataset-dir "$(DATASET_DIR)" --waxal-train-manifest data/quality/clean_train_alvin_lingala_v1.csv --output-dir "$(GENERALIZATION_DATASET_DIR)" --include-fleurs --include-salt $(FLEURS_MAX_ARG) $(SALT_MAX_ARG)
+
+prepare-generalization-mix-all:
+	$(UV_RUN) scripts/prepare_generalization_mix.py --waxal-dataset-dir "$(DATASET_DIR)" --waxal-train-manifest data/quality/clean_train_alvin_lingala_v1.csv --output-dir "$(GENERALIZATION_DATASET_DIR)" --include-fleurs --include-salt --include-lingala-100hrs --allow-unverified-lingala-100hrs $(FLEURS_MAX_ARG) $(SALT_MAX_ARG) $(LINGALA_100HRS_MAX_ARG)
+
+train-xlsr-generalization-mix-smoke:
+	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_300m_generalization_mix.yaml --dataset-dir "$(GENERALIZATION_DATASET_DIR)" --max-train-samples 12 --max-eval-samples 6 --max-steps 2 --output-dir checkpoints/xlsr_300m_generalization_mix_smoke
+
+train-xlsr-generalization-mix:
+	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_300m_generalization_mix.yaml --dataset-dir "$(GENERALIZATION_DATASET_DIR)"
+
+xlsr-generalization-mix-validation:
+	$(UV_RUN) scripts/run_xlsr_inference.py --checkpoint "$(XLSR_GENERALIZATION_MIX_CHECKPOINT)" --dataset-dir "$(GENERALIZATION_DATASET_DIR)" --split validation --batch-size 2 --output "$(XLSR_GENERALIZATION_MIX_VALID)"
+
+eval-xlsr-generalization-mix:
+	$(UV_RUN) scripts/evaluate_predictions.py --predictions "$(XLSR_GENERALIZATION_MIX_VALID)" --references "$(GENERALIZATION_DATASET_DIR)/validation.csv" --normalization all --output outputs/experiments/xlsr_300m_generalization_mix_validation_all_norms.json
+
+analyze-xlsr-generalization-mix-validation:
+	$(UV_RUN) scripts/analyze_prediction_distributions.py --predictions "$(XLSR_V2_CKPT6000_VALID)" "$(XLSR_GENERALIZATION_MIX_VALID)" --names xlsr_v2_ckpt6000 xlsr_generalization_mix --references "$(GENERALIZATION_DATASET_DIR)/validation.csv" --normalization all --output outputs/analysis/xlsr_generalization_mix_vs_v2_validation.json
+
+xlsr-generalization-mix-test:
+	$(UV_RUN) scripts/run_xlsr_inference.py --checkpoint "$(XLSR_GENERALIZATION_MIX_CHECKPOINT)" --dataset-dir "$(GENERALIZATION_DATASET_DIR)" --split test --batch-size 2 --output "$(XLSR_GENERALIZATION_MIX_TEST)"
+
+analyze-xlsr-generalization-mix-test:
+	$(UV_RUN) scripts/analyze_prediction_distributions.py --predictions "$(XLSR_V2_CKPT6000_TEST)" "$(XLSR_GENERALIZATION_MIX_TEST)" --names xlsr_v2_ckpt6000 xlsr_generalization_mix --output outputs/analysis/xlsr_generalization_mix_vs_v2_test.json
+
+submission-xlsr-generalization-mix:
+	$(UV_RUN) scripts/make_submission.py --predictions "$(XLSR_GENERALIZATION_MIX_TEST)" $(RAW_ARG) --model-name xlsr_generalization_mix --output outputs/submissions/submission_xlsr_generalization_mix.csv
 
 eval-xlsr-clean-all:
 	$(UV_RUN) scripts/evaluate_predictions.py --predictions "$(XLSR_CLEAN_PREDICTIONS)" --references "$(DATASET_DIR)/validation.csv" --normalization all --output outputs/experiments/xlsr_300m_balanced_clean_all_validation_all_norms.json

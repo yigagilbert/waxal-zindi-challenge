@@ -80,6 +80,16 @@ def clean_ctc_text(text: str, word_delimiter: str | None) -> str:
     return normalize_text(str(text).replace(delimiter, " "), "raw")
 
 
+def decode_ctc_batch(processor, logits, pred_ids, word_delimiter: str | None) -> list[str]:
+    """Decode CTC outputs for both plain and LM-backed Wav2Vec2 processors."""
+    if hasattr(processor, "decoder"):
+        decoded = processor.batch_decode(logits.detach().float().cpu().numpy())
+        texts = decoded.text if hasattr(decoded, "text") else decoded["text"]
+    else:
+        texts = processor.batch_decode(pred_ids)
+    return [clean_ctc_text(text, word_delimiter) for text in texts]
+
+
 def token_stat_row(
     example_id: str,
     logits,
@@ -164,8 +174,7 @@ def run_ctc(args: argparse.Namespace, ds) -> tuple[list[dict[str, str]], list[di
         with torch.no_grad():
             logits = model(**inputs).logits
         pred_ids = torch.argmax(logits, dim=-1)
-        decoded = processor.batch_decode(pred_ids)
-        predictions = [clean_ctc_text(text, word_delimiter) for text in decoded]
+        predictions = decode_ctc_batch(processor, logits, pred_ids, word_delimiter)
         for idx, (example_id, pred) in enumerate(zip(batch["ID"], predictions, strict=True)):
             rows.append({"ID": example_id, "Target": pred, "language": "lin", "model": args.model_name})
             if args.token_stats_output:
@@ -184,10 +193,12 @@ def run_ctc(args: argparse.Namespace, ds) -> tuple[list[dict[str, str]], list[di
     meta = {
         "model_type": "ctc",
         "device": device,
+        "processor_class": processor.__class__.__name__,
         "tokenizer_class": tokenizer.__class__.__name__ if tokenizer is not None else "",
         "word_delimiter_token": word_delimiter,
         "pad_token_id": pad_token_id,
         "blank_token_id": blank_token_id,
+        "has_lm_decoder": hasattr(processor, "decoder"),
     }
     return rows, token_stats, meta
 

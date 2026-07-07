@@ -41,6 +41,25 @@ Why:
 7. Run Alvin on WAXAL Lingala test for sanity comparison.
 8. Decide between routing, fine-tuning, filtering, or external-data warm-start.
 
+Current decision after the Alvin train-teacher pass:
+
+- do not route separate models for the final strategy,
+- do not use Alvin labels as replacements yet,
+- do not use `KasuleTrevor/Lingala_100hrs` yet,
+- train one multilingual XLS-R 300M model using `data/quality/clean_train_alvin_lingala_v1.csv`.
+
+Next config:
+
+```text
+configs/xlsr_300m_balanced_alvin_lingala_all.yaml
+```
+
+Runbook:
+
+```text
+docs/NEXT_TRAINING_RUN.md
+```
+
 ## Commands
 
 ```bash
@@ -99,6 +118,8 @@ Use if:
 - Alvin finds many suspicious labels,
 - Alvin direct predictions are not good enough for routing,
 - model disagreement appears to diagnose training noise.
+
+This is the selected next run. It is more Phase 2-safe than a routed submission because it produces one multilingual model.
 
 ### D. External Warm-Start
 
