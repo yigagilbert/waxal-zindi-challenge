@@ -32,16 +32,39 @@ XLSR_ALVIN_LINGALA_ALL_CHECKPOINT ?= $(XLSR_ALVIN_LINGALA_ALL_BASE)/checkpoint-6
 XLSR_ALVIN_LINGALA_ALL_VALID ?= outputs/predictions/xlsr_300m_balanced_alvin_lingala_checkpoint6000_validation.csv
 XLSR_ALVIN_LINGALA_ALL_TEST ?= outputs/predictions/xlsr_300m_balanced_alvin_lingala_checkpoint6000_test.csv
 XLSR_GENERALIZATION_MIX_BASE ?= checkpoints/xlsr_300m_generalization_mix
-XLSR_GENERALIZATION_MIX_CHECKPOINT ?= $(XLSR_GENERALIZATION_MIX_BASE)/checkpoint-8000
-XLSR_GENERALIZATION_MIX_VALID ?= outputs/predictions/xlsr_300m_generalization_mix_checkpoint8000_validation.csv
-XLSR_GENERALIZATION_MIX_TEST ?= outputs/predictions/xlsr_300m_generalization_mix_checkpoint8000_test.csv
+XLSR_GENERALIZATION_MIX_STEP ?= 24000
+XLSR_GENERALIZATION_MIX_CHECKPOINT ?= $(XLSR_GENERALIZATION_MIX_BASE)/checkpoint-$(XLSR_GENERALIZATION_MIX_STEP)
+XLSR_GENERALIZATION_MIX_VALID ?= outputs/predictions/xlsr_300m_generalization_mix_checkpoint$(XLSR_GENERALIZATION_MIX_STEP)_validation.csv
+XLSR_GENERALIZATION_MIX_TEST ?= outputs/predictions/xlsr_300m_generalization_mix_checkpoint$(XLSR_GENERALIZATION_MIX_STEP)_test.csv
+XLSR_GENERALIZATION_MIX_VALID_BEAM_LM ?= outputs/predictions/xlsr_300m_generalization_mix_checkpoint$(XLSR_GENERALIZATION_MIX_STEP)_validation_beam_lm.csv
+XLSR_GENERALIZATION_MIX_TEST_BEAM_LM ?= outputs/predictions/xlsr_300m_generalization_mix_checkpoint$(XLSR_GENERALIZATION_MIX_STEP)_test_beam_lm.csv
+XLSR_GENERALIZATION_MIX_SUBMISSION ?= outputs/submissions/submission_xlsr_generalization_mix.csv
 FLEURS_MAX_PER_LANGUAGE ?=
 SALT_MAX ?=
 LINGALA_100HRS_MAX ?=
 FLEURS_MAX_ARG := $(if $(FLEURS_MAX_PER_LANGUAGE),--fleurs-max-per-language "$(FLEURS_MAX_PER_LANGUAGE)",)
 SALT_MAX_ARG := $(if $(SALT_MAX),--salt-max "$(SALT_MAX)",)
 LINGALA_100HRS_MAX_ARG := $(if $(LINGALA_100HRS_MAX),--lingala-100hrs-max "$(LINGALA_100HRS_MAX)",)
+ROUTED_FALLBACK_VALID ?= outputs/analysis/routed_fallback_validation.csv
+ROUTED_FALLBACK_TEST ?= outputs/submissions/submission_generalization_mix_with_alvin_fallback.csv
+ROUTED_FALLBACK_VALID_REPORT ?= outputs/analysis/routed_fallback_validation_report.json
+ROUTED_FALLBACK_TEST_REPORT ?= outputs/analysis/routed_fallback_test_report.json
+ROUTING_REFERENCES ?= $(GENERALIZATION_DATASET_DIR)/validation.csv
+MODEL_ZOO_VALIDATION_ARGS ?= --validation-prediction xlsr_generalization_mix="$(XLSR_GENERALIZATION_MIX_VALID)" --validation-prediction xlsr_v2_ckpt6000="$(XLSR_V2_CKPT6000_VALID)" --validation-prediction alvin_lingala="$(ALVIN_LINGALA_VALID)"
+MODEL_ZOO_TEST_ARGS ?= --test-prediction xlsr_generalization_mix="$(XLSR_GENERALIZATION_MIX_TEST)" --test-prediction xlsr_v2_ckpt6000="$(XLSR_V2_CKPT6000_TEST)" --test-prediction alvin_lingala="$(ALVIN_LINGALA_TEST)"
+EXTRA_MODEL_ZOO_VALIDATION_ARGS ?=
+EXTRA_MODEL_ZOO_TEST_ARGS ?=
+MODEL_ZOO_FALLBACK_PRIORITY ?= --fallback-priority lin=alvin_lingala,noirlab_whisper_lingala,xlsr_v2_ckpt6000 --fallback-priority sna=xlsr_v2_ckpt6000 --fallback-priority lug=xlsr_generalization_mix
+KENLM_DIR ?= data/lm
+KENLM_ORDER ?= 5
+XLSR_1B_GENERALIZATION_MIX_BASE ?= checkpoints/xlsr_1b_generalization_mix
+XLSR_1B_GENERALIZATION_MIX_STEP ?= 24000
+XLSR_1B_GENERALIZATION_MIX_CHECKPOINT ?= $(XLSR_1B_GENERALIZATION_MIX_BASE)/checkpoint-$(XLSR_1B_GENERALIZATION_MIX_STEP)
+XLSR_1B_GENERALIZATION_MIX_VALID ?= outputs/predictions/xlsr_1b_generalization_mix_checkpoint$(XLSR_1B_GENERALIZATION_MIX_STEP)_validation.csv
+RAW_ARG_ROUTING := $(if $(RAW_DIR),--raw-dir "$(RAW_DIR)",)
 UV_RUN := uv run $(if $(WAXAL_NO_SYNC),--no-sync,)
+
+.PHONY: analyze-routing-inputs routed-fallback-validation routed-fallback-submission model-zoo-routing-validation model-zoo-routed-submission build-waxal-kenlm xlsr-generalization-mix-validation-beam xlsr-generalization-mix-validation-lin-beam-lm xlsr-generalization-mix-validation-lug-beam-lm xlsr-generalization-mix-validation-sna-beam-lm xlsr-generalization-mix-validation-beam-lm eval-xlsr-generalization-mix-beam-lm xlsr-generalization-mix-test-lin-beam-lm xlsr-generalization-mix-test-lug-beam-lm xlsr-generalization-mix-test-sna-beam-lm xlsr-generalization-mix-test-beam-lm train-xlsr-1b-generalization-mix-smoke train-xlsr-1b-generalization-mix xlsr-1b-generalization-mix-validation eval-xlsr-1b-generalization-mix sweep-kenlm-params no-metadata-validation audit-audio-text clean-trim-audio-smoke clean-trim-audio push-clean-dataset train-xlsr-300m-clean-audio-smoke train-xlsr-300m-clean-audio train-xlsr-300m-clean-audio-plus-medium train-xlsr-1b-clean-audio train-xlsr-1b-clean-audio-plus-medium
 
 audit:
 	$(UV_RUN) scripts/audit_data.py $(RAW_ARG) --output outputs/data_audit.json
@@ -258,7 +281,104 @@ analyze-xlsr-generalization-mix-test:
 	$(UV_RUN) scripts/analyze_prediction_distributions.py --predictions "$(XLSR_V2_CKPT6000_TEST)" "$(XLSR_GENERALIZATION_MIX_TEST)" --names xlsr_v2_ckpt6000 xlsr_generalization_mix --output outputs/analysis/xlsr_generalization_mix_vs_v2_test.json
 
 submission-xlsr-generalization-mix:
-	$(UV_RUN) scripts/make_submission.py --predictions "$(XLSR_GENERALIZATION_MIX_TEST)" $(RAW_ARG) --model-name xlsr_generalization_mix --output outputs/submissions/submission_xlsr_generalization_mix.csv
+	$(UV_RUN) scripts/make_submission.py --predictions "$(XLSR_GENERALIZATION_MIX_TEST)" $(RAW_ARG) --model-name xlsr_generalization_mix --output "$(XLSR_GENERALIZATION_MIX_SUBMISSION)"
+
+analyze-routing-inputs:
+	$(UV_RUN) scripts/analyze_prediction_distributions.py --predictions "$(XLSR_GENERALIZATION_MIX_TEST)" "$(XLSR_V2_CKPT6000_TEST)" "$(ALVIN_LINGALA_TEST)" --names xlsr_generalization_mix xlsr_v2_ckpt6000 alvin_lingala --output outputs/analysis/routing_input_test_sanity.json
+
+routed-fallback-validation:
+	$(UV_RUN) scripts/build_routed_fallback_submission.py --base-predictions "$(XLSR_GENERALIZATION_MIX_VALID)" --sample-order "$(GENERALIZATION_DATASET_DIR)/validation.csv" --references "$(GENERALIZATION_DATASET_DIR)/validation.csv" --alvin-lingala "$(ALVIN_LINGALA_VALID)" --shona-fallback "$(XLSR_V2_CKPT6000_VALID)" --comparison-predictions xlsr_v2_ckpt6000="$(XLSR_V2_CKPT6000_VALID)" --output "$(ROUTED_FALLBACK_VALID)" --report "$(ROUTED_FALLBACK_VALID_REPORT)"
+
+routed-fallback-submission:
+	$(UV_RUN) scripts/build_routed_fallback_submission.py --base-predictions "$(XLSR_GENERALIZATION_MIX_SUBMISSION)" $(RAW_ARG_ROUTING) --alvin-lingala "$(ALVIN_LINGALA_TEST)" --shona-fallback "$(XLSR_V2_CKPT6000_TEST)" --comparison-predictions xlsr_v2_ckpt6000="$(XLSR_V2_CKPT6000_TEST)" --output "$(ROUTED_FALLBACK_TEST)" --report "$(ROUTED_FALLBACK_TEST_REPORT)"
+
+model-zoo-routing-validation:
+	$(UV_RUN) scripts/model_zoo_routing.py --references "$(ROUTING_REFERENCES)" --base-model xlsr_generalization_mix $(MODEL_ZOO_VALIDATION_ARGS) $(EXTRA_MODEL_ZOO_VALIDATION_ARGS) $(MODEL_ZOO_FALLBACK_PRIORITY)
+
+model-zoo-routed-submission:
+	$(UV_RUN) scripts/model_zoo_routing.py --references "$(ROUTING_REFERENCES)" --base-model xlsr_generalization_mix $(MODEL_ZOO_VALIDATION_ARGS) $(EXTRA_MODEL_ZOO_VALIDATION_ARGS) $(MODEL_ZOO_TEST_ARGS) $(EXTRA_MODEL_ZOO_TEST_ARGS) $(MODEL_ZOO_FALLBACK_PRIORITY) $(RAW_ARG_ROUTING)
+
+build-waxal-kenlm:
+	$(UV_RUN) scripts/build_kenlm_decoders.py --csv "$(GENERALIZATION_DATASET_DIR)/train.csv" --output-dir "$(KENLM_DIR)" --order "$(KENLM_ORDER)" --overwrite
+
+xlsr-generalization-mix-validation-beam:
+	$(UV_RUN) scripts/run_xlsr_inference.py --checkpoint "$(XLSR_GENERALIZATION_MIX_CHECKPOINT)" --dataset-dir "$(GENERALIZATION_DATASET_DIR)" --split validation --batch-size 2 --decoder-mode beam --beam-width 100 --output outputs/predictions/xlsr_300m_generalization_mix_checkpoint$(XLSR_GENERALIZATION_MIX_STEP)_validation_beam.csv
+
+xlsr-generalization-mix-validation-lin-beam-lm:
+	$(UV_RUN) scripts/run_xlsr_inference.py --checkpoint "$(XLSR_GENERALIZATION_MIX_CHECKPOINT)" --dataset-dir "$(GENERALIZATION_DATASET_DIR)" --split validation --languages lin --batch-size 2 --decoder-mode beam_lm --kenlm-model "$(KENLM_DIR)/lin_$(KENLM_ORDER)gram.binary" --beam-width 100 --output outputs/predictions/xlsr_300m_generalization_mix_checkpoint$(XLSR_GENERALIZATION_MIX_STEP)_validation_lin_beam_lm.csv
+
+xlsr-generalization-mix-validation-lug-beam-lm:
+	$(UV_RUN) scripts/run_xlsr_inference.py --checkpoint "$(XLSR_GENERALIZATION_MIX_CHECKPOINT)" --dataset-dir "$(GENERALIZATION_DATASET_DIR)" --split validation --languages lug --batch-size 2 --decoder-mode beam_lm --kenlm-model "$(KENLM_DIR)/lug_$(KENLM_ORDER)gram.binary" --beam-width 100 --output outputs/predictions/xlsr_300m_generalization_mix_checkpoint$(XLSR_GENERALIZATION_MIX_STEP)_validation_lug_beam_lm.csv
+
+xlsr-generalization-mix-validation-sna-beam-lm:
+	$(UV_RUN) scripts/run_xlsr_inference.py --checkpoint "$(XLSR_GENERALIZATION_MIX_CHECKPOINT)" --dataset-dir "$(GENERALIZATION_DATASET_DIR)" --split validation --languages sna --batch-size 2 --decoder-mode beam_lm --kenlm-model "$(KENLM_DIR)/sna_$(KENLM_ORDER)gram.binary" --beam-width 100 --output outputs/predictions/xlsr_300m_generalization_mix_checkpoint$(XLSR_GENERALIZATION_MIX_STEP)_validation_sna_beam_lm.csv
+
+xlsr-generalization-mix-validation-beam-lm: xlsr-generalization-mix-validation-lin-beam-lm xlsr-generalization-mix-validation-lug-beam-lm xlsr-generalization-mix-validation-sna-beam-lm
+	$(UV_RUN) scripts/merge_predictions.py --predictions outputs/predictions/xlsr_300m_generalization_mix_checkpoint$(XLSR_GENERALIZATION_MIX_STEP)_validation_lin_beam_lm.csv --predictions outputs/predictions/xlsr_300m_generalization_mix_checkpoint$(XLSR_GENERALIZATION_MIX_STEP)_validation_lug_beam_lm.csv --predictions outputs/predictions/xlsr_300m_generalization_mix_checkpoint$(XLSR_GENERALIZATION_MIX_STEP)_validation_sna_beam_lm.csv --order "$(GENERALIZATION_DATASET_DIR)/validation.csv" --output "$(XLSR_GENERALIZATION_MIX_VALID_BEAM_LM)"
+
+eval-xlsr-generalization-mix-beam-lm:
+	$(UV_RUN) scripts/evaluate_predictions.py --predictions "$(XLSR_GENERALIZATION_MIX_VALID_BEAM_LM)" --references "$(GENERALIZATION_DATASET_DIR)/validation.csv" --normalization all --output outputs/experiments/xlsr_300m_generalization_mix_validation_beam_lm_all_norms.json
+
+xlsr-generalization-mix-test-lin-beam-lm:
+	$(UV_RUN) scripts/run_xlsr_inference.py --checkpoint "$(XLSR_GENERALIZATION_MIX_CHECKPOINT)" --dataset-dir "$(GENERALIZATION_DATASET_DIR)" --split test --languages lin --batch-size 2 --decoder-mode beam_lm --kenlm-model "$(KENLM_DIR)/lin_$(KENLM_ORDER)gram.binary" --beam-width 100 --output outputs/predictions/xlsr_300m_generalization_mix_checkpoint$(XLSR_GENERALIZATION_MIX_STEP)_test_lin_beam_lm.csv
+
+xlsr-generalization-mix-test-lug-beam-lm:
+	$(UV_RUN) scripts/run_xlsr_inference.py --checkpoint "$(XLSR_GENERALIZATION_MIX_CHECKPOINT)" --dataset-dir "$(GENERALIZATION_DATASET_DIR)" --split test --languages lug --batch-size 2 --decoder-mode beam_lm --kenlm-model "$(KENLM_DIR)/lug_$(KENLM_ORDER)gram.binary" --beam-width 100 --output outputs/predictions/xlsr_300m_generalization_mix_checkpoint$(XLSR_GENERALIZATION_MIX_STEP)_test_lug_beam_lm.csv
+
+xlsr-generalization-mix-test-sna-beam-lm:
+	$(UV_RUN) scripts/run_xlsr_inference.py --checkpoint "$(XLSR_GENERALIZATION_MIX_CHECKPOINT)" --dataset-dir "$(GENERALIZATION_DATASET_DIR)" --split test --languages sna --batch-size 2 --decoder-mode beam_lm --kenlm-model "$(KENLM_DIR)/sna_$(KENLM_ORDER)gram.binary" --beam-width 100 --output outputs/predictions/xlsr_300m_generalization_mix_checkpoint$(XLSR_GENERALIZATION_MIX_STEP)_test_sna_beam_lm.csv
+
+xlsr-generalization-mix-test-beam-lm: xlsr-generalization-mix-test-lin-beam-lm xlsr-generalization-mix-test-lug-beam-lm xlsr-generalization-mix-test-sna-beam-lm
+	$(UV_RUN) scripts/merge_predictions.py --predictions outputs/predictions/xlsr_300m_generalization_mix_checkpoint$(XLSR_GENERALIZATION_MIX_STEP)_test_lin_beam_lm.csv --predictions outputs/predictions/xlsr_300m_generalization_mix_checkpoint$(XLSR_GENERALIZATION_MIX_STEP)_test_lug_beam_lm.csv --predictions outputs/predictions/xlsr_300m_generalization_mix_checkpoint$(XLSR_GENERALIZATION_MIX_STEP)_test_sna_beam_lm.csv $(RAW_ARG_ROUTING) --output "$(XLSR_GENERALIZATION_MIX_TEST_BEAM_LM)"
+
+HF_CLEAN_REPO ?=
+CLEAN_AUDIO_DATASET_DIR ?= data/final_combined_clean_audio_dataset
+
+audit-audio-text:
+	$(UV_RUN) scripts/audit_audio_text_consistency.py --dataset-dir "$(GENERALIZATION_DATASET_DIR)" --dataset-dir "$(DATASET_DIR)" --splits train validation
+
+clean-trim-audio-smoke:
+	$(UV_RUN) scripts/clean_and_trim_audio_dataset.py --dataset-dir "$(GENERALIZATION_DATASET_DIR)" --max-samples-per-split 200 --output-audio-dir data/audio_cleaned_smoke --output-dataset data/final_clean_smoke --quality-dir data/quality_smoke --reports-dir outputs/data_quality_smoke
+
+clean-trim-audio:
+	$(UV_RUN) scripts/clean_and_trim_audio_dataset.py --dataset-dir "$(GENERALIZATION_DATASET_DIR)"
+
+push-clean-dataset:
+	@test -n "$(HF_CLEAN_REPO)" || (echo "Set HF_CLEAN_REPO=<user>/waxal-combined-clean-audio-asr-private" && exit 1)
+	$(UV_RUN) scripts/push_clean_dataset_to_hub.py --dataset "$(CLEAN_AUDIO_DATASET_DIR)" --repo-id "$(HF_CLEAN_REPO)"
+
+train-xlsr-300m-clean-audio-smoke:
+	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_300m_clean_audio_only_v1.yaml --dataset-dir "$(CLEAN_AUDIO_DATASET_DIR)" --max-train-samples 12 --max-eval-samples 6 --max-steps 2 --output-dir checkpoints/xlsr_300m_clean_audio_smoke
+
+train-xlsr-300m-clean-audio:
+	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_300m_clean_audio_only_v1.yaml --dataset-dir "$(CLEAN_AUDIO_DATASET_DIR)"
+
+train-xlsr-300m-clean-audio-plus-medium:
+	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_300m_clean_audio_plus_medium_v1.yaml --dataset-dir "$(CLEAN_AUDIO_DATASET_DIR)"
+
+train-xlsr-1b-clean-audio:
+	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_1b_clean_audio_only_v1.yaml --dataset-dir "$(CLEAN_AUDIO_DATASET_DIR)"
+
+train-xlsr-1b-clean-audio-plus-medium:
+	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_1b_clean_audio_plus_medium_v1.yaml --dataset-dir "$(CLEAN_AUDIO_DATASET_DIR)"
+
+train-xlsr-1b-generalization-mix-smoke:
+	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_1b_generalization_mix.yaml --dataset-dir "$(GENERALIZATION_DATASET_DIR)" --max-train-samples 12 --max-eval-samples 6 --max-steps 2 --output-dir checkpoints/xlsr_1b_generalization_mix_smoke
+
+train-xlsr-1b-generalization-mix:
+	$(UV_RUN) scripts/train_xlsr_ctc.py --config configs/xlsr_1b_generalization_mix.yaml --dataset-dir "$(GENERALIZATION_DATASET_DIR)"
+
+xlsr-1b-generalization-mix-validation:
+	$(UV_RUN) scripts/run_xlsr_inference.py --checkpoint "$(XLSR_1B_GENERALIZATION_MIX_CHECKPOINT)" --dataset-dir "$(GENERALIZATION_DATASET_DIR)" --split validation --batch-size 4 --output "$(XLSR_1B_GENERALIZATION_MIX_VALID)"
+
+eval-xlsr-1b-generalization-mix:
+	$(UV_RUN) scripts/evaluate_predictions.py --predictions "$(XLSR_1B_GENERALIZATION_MIX_VALID)" --references "$(GENERALIZATION_DATASET_DIR)/validation.csv" --normalization all --output outputs/experiments/xlsr_1b_generalization_mix_validation_all_norms.json
+
+sweep-kenlm-params:
+	$(UV_RUN) scripts/sweep_kenlm_decode_params.py --checkpoint "$(XLSR_GENERALIZATION_MIX_CHECKPOINT)" --dataset-dir "$(GENERALIZATION_DATASET_DIR)" --kenlm-dir "$(KENLM_DIR)" --order "$(KENLM_ORDER)" --output outputs/analysis/kenlm_alpha_beta_sweep.json
+
+no-metadata-validation:
+	$(UV_RUN) scripts/run_no_metadata_pipeline.py --checkpoint "$(XLSR_GENERALIZATION_MIX_CHECKPOINT)" --dataset-dir "$(GENERALIZATION_DATASET_DIR)" --split validation --kenlm-dir "$(KENLM_DIR)" --order "$(KENLM_ORDER)" --output-predictions outputs/predictions/no_metadata_validation.csv --report outputs/analysis/no_metadata_validation_report.json
 
 eval-xlsr-clean-all:
 	$(UV_RUN) scripts/evaluate_predictions.py --predictions "$(XLSR_CLEAN_PREDICTIONS)" --references "$(DATASET_DIR)/validation.csv" --normalization all --output outputs/experiments/xlsr_300m_balanced_clean_all_validation_all_norms.json

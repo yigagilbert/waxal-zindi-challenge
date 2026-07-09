@@ -1,9 +1,12 @@
-run_name: xlsr_300m_generalization_mix
+run_name: xlsr_300m_clean_audio_only_v1
 model:
   name: facebook/wav2vec2-xls-r-300m
   freeze_feature_encoder: true
 data:
-  dataset_dir: data/processed_generalization_mix
+  # cleaned-audio dataset built by scripts/clean_and_trim_audio_dataset.py
+  # (preprocessing_version clean_audio_v1); train split = clean bucket only
+  dataset_dir: data/final_combined_clean_audio_dataset
+  extra_train_splits: []
   train_manifest: null
   include_medium: false
   languages: null
@@ -19,7 +22,7 @@ tracking:
   report_to: none
   local_dir: outputs/experiments
 training_args:
-  output_dir: checkpoints/xlsr_300m_generalization_mix
+  output_dir: checkpoints/xlsr_300m_clean_audio_only_v1
   per_device_train_batch_size: 2
   per_device_eval_batch_size: 2
   gradient_accumulation_steps: 8

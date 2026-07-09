@@ -231,6 +231,17 @@ def main() -> None:
     dataset_dict = load_from_disk(Path(dataset_dir) / "hf_dataset")
     train_ds = dataset_dict["train"]
     eval_ds = dataset_dict["validation"]
+    extra_train_splits = data_config.get("extra_train_splits") or []
+    if extra_train_splits:
+        from datasets import concatenate_datasets
+
+        parts = [train_ds]
+        for split_name in extra_train_splits:
+            if split_name not in dataset_dict:
+                raise ValueError(f"extra_train_splits entry {split_name!r} not found in dataset: {list(dataset_dict)}")
+            parts.append(dataset_dict[split_name])
+            print(f"Appending extra train split: {split_name} ({len(dataset_dict[split_name])} rows)")
+        train_ds = concatenate_datasets(parts)
     languages = data_config.get("languages")
     if languages:
         language_set = set(languages)

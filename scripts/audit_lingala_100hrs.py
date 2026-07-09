@@ -199,12 +199,19 @@ def main() -> None:
         weird_counter: Counter[str] = Counter()
         source_counter: Counter[str] = Counter()
         split_texts: Counter[str] = Counter()
+        sample_rate_counter: Counter[int] = Counter()
+        observed_columns: list[str] = []
 
         iterator = iter(ds)
         for row in iterator:
             if args.max_rows_per_split is not None and rows_seen >= args.max_rows_per_split:
                 break
             rows_seen += 1
+            if not observed_columns:
+                observed_columns = sorted(row.keys())
+            audio_value = row.get("audio")
+            if isinstance(audio_value, dict) and audio_value.get("sampling_rate"):
+                sample_rate_counter[int(audio_value["sampling_rate"])] += 1
             text = normalize_text(text_value(row), "raw")
             source = source_value(row)
             source_counter[source] += 1
@@ -235,6 +242,9 @@ def main() -> None:
 
         split_reports[split] = {
             "rows_seen": rows_seen,
+            "observed_columns": observed_columns,
+            "observed_sampling_rates": dict(sorted(sample_rate_counter.items())),
+            "total_hours": round(sum(durations) / 3600.0, 2) if durations else None,
             "source_counts": dict(sorted(source_counter.items())),
             "duration_seconds": summary(durations),
             "text_chars": summary(text_chars),
@@ -262,11 +272,16 @@ def main() -> None:
         )
     write_source_stats(args.source_stats_output, source_rows)
 
+    sources_by_text: dict[str, set[str]] = defaultdict(set)
+    for (split, source), bucket in source_buckets.items():
+        for text in bucket["texts"]:
+            sources_by_text[text].add(source)
     payload = {
         "dataset_info": dataset_info,
         "splits": split_reports,
         "overall": {
             "duplicate_text_count": sum(count - 1 for count in all_texts.values() if count > 1),
+            "texts_shared_across_sources": sum(1 for sources in sources_by_text.values() if len(sources) > 1),
             "possible_text_overlap_with_waxal_lingala_train": possible_text_overlap,
             "possible_id_overlap_with_waxal_test": possible_id_overlap,
         },

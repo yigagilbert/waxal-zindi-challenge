@@ -25,6 +25,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-samples", type=int, default=None)
     parser.add_argument("--batch-size", type=int, default=2)
     parser.add_argument("--device", default=None)
+    parser.add_argument("--decoder-mode", choices=["greedy", "beam", "beam_lm"], default="greedy")
+    parser.add_argument("--kenlm-model", type=Path, default=None)
+    parser.add_argument("--beam-width", type=int, default=100)
+    parser.add_argument("--alpha", type=float, default=0.5)
+    parser.add_argument("--beta", type=float, default=1.5)
     return parser.parse_args()
 
 
@@ -94,6 +99,72 @@ def clean_ctc_prediction(text: str, word_delimiter: str | None) -> str:
     return normalize_text(text, "raw")
 
 
+def build_ctc_labels(tokenizer) -> list[str]:
+    """Build pyctcdecode labels from a CTC tokenizer vocabulary.
+
+    pyctcdecode requires unique labels: only the pad/blank slot may be empty.
+    [UNK] is normalized to pyctcdecode's UNK token by the library itself;
+    <s>/</s> stay literal and are stripped after decoding.
+    """
+    vocab = tokenizer.get_vocab()
+    labels = [""] * len(vocab)
+    word_delimiter = tokenizer.word_delimiter_token
+    for token, idx in vocab.items():
+        if token == word_delimiter:
+            labels[idx] = " "
+        elif token == tokenizer.pad_token:
+            labels[idx] = ""
+        else:
+            labels[idx] = token
+    return labels
+
+
+def build_pyctcdecode_decoder(processor, args: argparse.Namespace):
+    if args.decoder_mode == "greedy":
+        return None
+    if args.decoder_mode == "beam_lm" and args.kenlm_model is None:
+        raise ValueError("--kenlm-model is required when --decoder-mode beam_lm")
+    if args.kenlm_model is not None and not args.kenlm_model.exists():
+        raise FileNotFoundError(f"KenLM model not found: {args.kenlm_model}")
+
+    try:
+        from pyctcdecode import build_ctcdecoder
+    except ImportError as exc:
+        raise RuntimeError(
+            "pyctcdecode is required for --decoder-mode beam/beam_lm. "
+            "Install with `uv pip install --python .venv/bin/python pyctcdecode`."
+        ) from exc
+
+    return build_ctcdecoder(
+        build_ctc_labels(processor.tokenizer),
+        kenlm_model_path=str(args.kenlm_model) if args.kenlm_model else None,
+        alpha=args.alpha,
+        beta=args.beta,
+    )
+
+
+def decode_logits(processor, logits, pred_ids, decoder, args: argparse.Namespace) -> list[str]:
+    tokenizer = processor.tokenizer
+    if decoder is None:
+        decoded = processor.batch_decode(pred_ids)
+    else:
+        logits_np = logits.detach().float().cpu().numpy()
+        decoded = [decoder.decode(item, beam_width=args.beam_width) for item in logits_np]
+        leftover_specials = [
+            token
+            for token in (
+                tokenizer.unk_token,
+                getattr(tokenizer, "bos_token", None),
+                getattr(tokenizer, "eos_token", None),
+                "⁇",  # pyctcdecode's UNK output token
+            )
+            if token
+        ]
+        for special in leftover_specials:
+            decoded = [text.replace(special, " ") for text in decoded]
+    return [clean_ctc_prediction(text, tokenizer.word_delimiter_token) for text in decoded]
+
+
 def main() -> None:
     args = parse_args()
     try:
@@ -120,6 +191,7 @@ def main() -> None:
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
     model = AutoModelForCTC.from_pretrained(args.checkpoint).to(device)
     model.eval()
+    decoder = build_pyctcdecode_decoder(processor, args)
 
     output = args.output
     if output is None:
@@ -141,8 +213,7 @@ def main() -> None:
         with torch.no_grad():
             logits = model(**inputs).logits
         pred_ids = torch.argmax(logits, dim=-1)
-        decoded = processor.batch_decode(pred_ids)
-        decoded = [clean_ctc_prediction(text, processor.tokenizer.word_delimiter_token) for text in decoded]
+        decoded = decode_logits(processor, logits, pred_ids, decoder, args)
         for example_id, pred in zip(batch["ID"], decoded, strict=True):
             rows.append({"ID": example_id, "Target": pred})
         print(f"Predicted {len(rows)}/{len(ds)}", flush=True)

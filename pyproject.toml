@@ -39,6 +39,8 @@ dev = [
 ]
 training = [
   "bitsandbytes>=0.44.0,<0.50; platform_system == 'Linux'",
+  "pyctcdecode>=0.5.0,<0.6",
+  "rapidfuzz>=3.9.0,<4",
   "sentencepiece>=0.2.0",
 ]
 notebook = [
@@ -58,6 +60,8 @@ dev = [
 ]
 training = [
   "bitsandbytes>=0.44.0,<0.50; platform_system == 'Linux'",
+  "pyctcdecode>=0.5.0,<0.6",
+  "rapidfuzz>=3.9.0,<4",
   "sentencepiece>=0.2.0",
 ]
 notebook = [

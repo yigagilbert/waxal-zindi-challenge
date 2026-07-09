@@ -115,6 +115,104 @@ def audio_stats(array: Any, sample_rate: int, silence_threshold: float = 1e-5) -
     )
 
 
+def frame_rms(array: Any, sample_rate: int, frame_ms: float = 30.0) -> Any:
+    """Per-frame RMS over non-overlapping frames."""
+    np = _np()
+    arr = to_mono(array)
+    frame = max(1, int(sample_rate * frame_ms / 1000.0))
+    if arr.size < frame:
+        return np.sqrt(np.mean(arr.astype(np.float64) ** 2, keepdims=True)) if arr.size else np.zeros(1)
+    usable = arr[: (arr.size // frame) * frame].reshape(-1, frame)
+    return np.sqrt((usable.astype(np.float64) ** 2).mean(axis=1))
+
+
+def extended_audio_stats(
+    array: Any,
+    sample_rate: int,
+    *,
+    frame_ms: float = 30.0,
+    silence_rms_threshold: float = 0.01,
+) -> dict[str, float]:
+    """RMS/peak/silence/clipping/edge-silence stats for quality auditing."""
+    np = _np()
+    arr = to_mono(array)
+    if arr.size == 0:
+        return {
+            "duration": 0.0,
+            "rms": 0.0,
+            "peak": 0.0,
+            "silence_ratio": 1.0,
+            "clipping_ratio": 0.0,
+            "leading_silence": 0.0,
+            "trailing_silence": 0.0,
+        }
+    frames = frame_rms(arr, sample_rate, frame_ms)
+    voiced = frames >= silence_rms_threshold
+    frame_len = frame_ms / 1000.0
+    leading = trailing = float(len(frames)) * frame_len
+    if voiced.any():
+        indices = np.where(voiced)[0]
+        leading = float(indices[0]) * frame_len
+        trailing = float(len(frames) - 1 - indices[-1]) * frame_len
+    return {
+        "duration": duration_seconds(arr, sample_rate),
+        "rms": float(np.sqrt(np.mean(arr.astype(np.float64) ** 2))),
+        "peak": float(np.max(np.abs(arr))),
+        "silence_ratio": float((~voiced).mean()),
+        "clipping_ratio": float((np.abs(arr) > 0.99).mean()),
+        "leading_silence": leading,
+        "trailing_silence": trailing,
+    }
+
+
+def trim_edges(
+    array: Any,
+    sample_rate: int,
+    *,
+    top_db: float = 40.0,
+    pad_ms: float = 200.0,
+    frame_ms: float = 30.0,
+    abs_rms_floor: float = 1e-4,
+) -> tuple[Any, dict[str, float | str]]:
+    """Conservatively trim leading/trailing silence, never internal pauses.
+
+    A frame counts as speech when its RMS is above both max(frame RMS) - top_db
+    and an absolute floor. The kept region is expanded by pad_ms on each side.
+    Returns (trimmed_array, metadata). When no speech frame is found the
+    original array is returned with status 'likely_empty_audio'.
+    """
+    np = _np()
+    arr = to_mono(array)
+    meta: dict[str, float | str] = {
+        "top_db": top_db,
+        "pad_ms": pad_ms,
+        "leading_silence_removed": 0.0,
+        "trailing_silence_removed": 0.0,
+        "status": "unchanged",
+    }
+    if arr.size == 0:
+        meta["status"] = "likely_empty_audio"
+        return arr, meta
+    frames = frame_rms(arr, sample_rate, frame_ms)
+    peak_rms = float(frames.max())
+    threshold = max(peak_rms * (10.0 ** (-top_db / 20.0)), abs_rms_floor)
+    voiced = frames >= threshold
+    if not voiced.any() or peak_rms < abs_rms_floor:
+        meta["status"] = "likely_empty_audio"
+        return arr, meta
+    frame = max(1, int(sample_rate * frame_ms / 1000.0))
+    pad = int(sample_rate * pad_ms / 1000.0)
+    indices = np.where(voiced)[0]
+    start = max(int(indices[0]) * frame - pad, 0)
+    end = min((int(indices[-1]) + 1) * frame + pad, arr.size)
+    trimmed = arr[start:end].astype(np.float32)
+    meta["leading_silence_removed"] = float(start / sample_rate)
+    meta["trailing_silence_removed"] = float((arr.size - end) / sample_rate)
+    if start > 0 or end < arr.size:
+        meta["status"] = "cleaned_ok"
+    return trimmed, meta
+
+
 def is_audio_usable(array: Any, sample_rate: int, min_duration: float = 0.05) -> tuple[bool, str]:
     """Return whether audio looks usable and a short reason."""
     stats = audio_stats(array, sample_rate)
