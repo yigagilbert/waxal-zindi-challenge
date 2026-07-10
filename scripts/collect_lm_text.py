@@ -61,6 +61,15 @@ HF_SOURCES = [
 
 DEFAULT_SPLITS = ["train", "validation", "test"]
 
+# In-domain WAXAL anchor pulled from HF (text-only, TRAIN split only to avoid
+# leaking validation text into an LM used to decode validation). Use when the
+# local generalization-mix train.csv is unavailable (e.g. on a fresh Colab).
+WAXAL_HF_SOURCES = [
+    {"dataset": "google/WaxalNLP", "config": "lin_asr", "language": "lin", "license": "CC-BY-4.0", "splits": ["train"]},
+    {"dataset": "google/WaxalNLP", "config": "lug_asr", "language": "lug", "license": "CC-BY-4.0", "splits": ["train"]},
+    {"dataset": "google/WaxalNLP", "config": "sna_asr", "language": "sna", "license": "CC-BY-4.0", "splits": ["train"]},
+]
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -74,7 +83,8 @@ def parse_args() -> argparse.Namespace:
         help="Local text CSV to include (WAXAL anchor etc.). Repeat. Defaults to the generalization-mix train.csv.",
     )
     parser.add_argument("--language-column", default="language")
-    parser.add_argument("--waxal-repeat", type=int, default=1, help="Repeat WAXAL/local-CSV lines N times to keep the LM domain-anchored.")
+    parser.add_argument("--waxal-repeat", type=int, default=1, help="Repeat WAXAL (local CSV or --waxal-from-hf) lines N times to keep the LM domain-anchored.")
+    parser.add_argument("--waxal-from-hf", action="store_true", help="Pull the WAXAL train-text anchor from google/WaxalNLP (use when no local train.csv, e.g. Colab).")
     parser.add_argument("--skip-hf", action="store_true", help="Only use local CSVs, no Hugging Face pulls.")
     parser.add_argument("--skip-source", action="append", default=[], help="dataset[:config] to skip. Repeat.")
     parser.add_argument("--max-lines-per-source", type=int, default=None, help="Cap lines per (source, split) so one corpus doesn't dominate.")
@@ -170,9 +180,13 @@ def harvest_hf_source(src: dict, languages: set[str], args: argparse.Namespace):
             print(f"  partial {src['dataset']}:{src.get('config')}/{split}: {type(exc).__name__}: {exc} (kept {n})")
         total += n
         print(f"  {src['dataset']}:{src.get('config')}/{split}: +{n} lines")
+    repeat = int(src.get("repeat", 1))
+    if repeat > 1 and lines:
+        lines = lines * repeat
     provenance = {
         "source": src["dataset"], "config": src.get("config"), "kind": "hf_stream_text_only",
-        "language": lang, "license": src["license"], "gated": bool(src.get("gated")), "lines": total,
+        "language": lang, "license": src["license"], "gated": bool(src.get("gated")),
+        "lines": len(lines), "unique_rows_before_repeat": total, "repeat": repeat,
     }
     return lines, provenance
 
@@ -208,9 +222,15 @@ def main() -> None:
         csv_paths, args.language_column, languages, args.normalization, args.min_chars, args.waxal_repeat
     )
 
+    hf_sources = list(HF_SOURCES)
+    if args.waxal_from_hf:
+        anchor = [{**src, "repeat": args.waxal_repeat} for src in WAXAL_HF_SOURCES]
+        hf_sources = anchor + hf_sources  # anchor first
+        print(f"WAXAL anchor from HF enabled (google/WaxalNLP train, x{args.waxal_repeat}).")
+
     skip = set(args.skip_source)
     if not args.skip_hf:
-        for src in HF_SOURCES:
+        for src in hf_sources:
             key = f"{src['dataset']}:{src.get('config')}"
             if key in skip or src["dataset"] in skip:
                 print(f"Skipping {key} (requested)")
