@@ -92,6 +92,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--noisy-clipping", type=float, default=0.05)
     parser.add_argument("--num-proc", type=int, default=8)
     parser.add_argument("--max-samples-per-split", type=int, default=None, help="Smoke-test cap.")
+    parser.add_argument(
+        "--preprocessing-version",
+        default=PREPROCESSING_VERSION,
+        help="Version tag stamped on every row (bump when the source mix or rules change, e.g. clean_audio_v2 once Lingala_100hrs is added).",
+    )
     return parser.parse_args()
 
 
@@ -179,7 +184,7 @@ def process_split(ds, *, split: str, args: argparse.Namespace) -> list[dict]:
                 "transcription": transcription,
                 "trim_threshold_used": args.top_db,
                 "trim_padding_ms": args.pad_ms,
-                "preprocessing_version": PREPROCESSING_VERSION,
+                "preprocessing_version": args.preprocessing_version,
             }
             try:
                 audio = batch["audio"][i]
@@ -348,7 +353,7 @@ def main() -> None:
     all_rows = train_rows + val_rows
     write_csv_rows(args.reports_dir / "audio_cleaning_report.csv", all_rows, METADATA_FIELDS)
     impact = {
-        "preprocessing_version": PREPROCESSING_VERSION,
+        "preprocessing_version": args.preprocessing_version,
         "git_commit": git_commit(),
         "source_dataset_dir": str(args.dataset_dir),
         "thresholds": {

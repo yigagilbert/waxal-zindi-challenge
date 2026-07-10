@@ -31,9 +31,11 @@ Lingala (lin), Luganda (lug), Shona (sna).
 | `google/WaxalNLP` (official challenge IDs/splits only) | WAXAL train/validation | CC-BY 4.0 | challenge-specified |
 | `google/fleurs` (lg_ug, ln_cd, sn_zw) | external read speech | CC-BY 4.0 | public external; documented in solution |
 | `Sunbird/salt` (Luganda configs) | external Luganda speech | CC-BY-SA 4.0 | public external; documented in solution |
+| `KasuleTrevor/Lingala_100hrs` (Afrivoice + LRSC + FLEURS aggregation) | external Lingala speech | CC-BY-4.0 per source (verified 2026-07-09) | included only from preprocessing_version `clean_audio_v2` onward; 63 undocumented `lingala_tts` rows and all WAXAL lin train/validation text overlaps (3,090 in the 2026-07-09 audit) are dropped at ingestion |
 
-No Phase 1 test labels are included anywhere. Test-split audio is not included.
-`KasuleTrevor/Lingala_100hrs` is NOT included (license/leakage review incomplete).
+No Phase 1 test labels are included anywhere. WAXAL test-split audio is not included.
+If this card ships with a `clean_audio_v1` build, Lingala_100hrs is NOT yet in it —
+check `preprocessing_version` in the row metadata / impact report.
 
 ## Splits
 

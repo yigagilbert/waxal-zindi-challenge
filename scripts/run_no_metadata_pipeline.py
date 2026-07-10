@@ -53,6 +53,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help='Optional per-language decode params, e.g. {"lin": {"alpha": 0.6, "beta": 1.0}}',
     )
+    parser.add_argument(
+        "--greedy-languages",
+        nargs="*",
+        default=["sna"],
+        help="Languages to decode greedily instead of beam+LM (sna: KenLM hurts per the sweep).",
+    )
     parser.add_argument("--beam-width", type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--max-samples", type=int, default=None)
@@ -65,10 +71,14 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    import logging
+
     import numpy as np
     import torch
     from pyctcdecode import build_ctcdecoder
     from transformers import AutoModelForCTC
+
+    logging.getLogger("pyctcdecode").setLevel(logging.ERROR)
 
     from waxal.data import write_csv_rows
 
@@ -132,22 +142,32 @@ def main() -> None:
     decoders = {}
     for language in args.languages:
         lang_params = params.get(language, {})
+        corpus_path = args.kenlm_dir / f"{language}.txt"
+        unigrams = (
+            sorted(set(corpus_path.read_text(encoding="utf-8").split())) if corpus_path.exists() else None
+        )
         decoders[language] = build_ctcdecoder(
             labels,
             kenlm_model_path=str(args.kenlm_dir / f"{language}_{args.order}gram.binary"),
+            unigrams=unigrams,
             alpha=float(lang_params.get("alpha", args.alpha)),
             beta=float(lang_params.get("beta", args.beta)),
         )
+    greedy_languages = set(args.greedy_languages or [])
     routed = []
     for index, item in enumerate(logits_list):
-        decoder = decoders[predicted_language[index]]
-        text = decoder.decode(item.astype(np.float32), beam_width=args.beam_width)
-        for special in (processor.tokenizer.unk_token, processor.tokenizer.bos_token, processor.tokenizer.eos_token, "⁇"):
-            if special:
-                text = text.replace(special, " ")
+        language = predicted_language[index]
+        if language in greedy_languages:
+            token_ids = item.astype(np.float32).argmax(-1)
+            text = processor.tokenizer.decode(token_ids)
+        else:
+            text = decoders[language].decode(item.astype(np.float32), beam_width=args.beam_width)
+            for special in (processor.tokenizer.unk_token, processor.tokenizer.bos_token, processor.tokenizer.eos_token, "⁇"):
+                if special:
+                    text = text.replace(special, " ")
         routed.append(clean_ctc_prediction(text, word_delimiter))
         if (index + 1) % 250 == 0:
-            print(f"Beam+LM decode {index + 1}/{len(logits_list)}", flush=True)
+            print(f"Routed decode {index + 1}/{len(logits_list)}", flush=True)
 
     rows = [{"ID": example_id, "Target": text.strip() or "."} for example_id, text in zip(ids, routed, strict=True)]
     write_csv_rows(args.output_predictions, rows, ["ID", "Target"])

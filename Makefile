@@ -57,6 +57,8 @@ EXTRA_MODEL_ZOO_TEST_ARGS ?=
 MODEL_ZOO_FALLBACK_PRIORITY ?= --fallback-priority lin=alvin_lingala,noirlab_whisper_lingala,xlsr_v2_ckpt6000 --fallback-priority sna=xlsr_v2_ckpt6000 --fallback-priority lug=xlsr_generalization_mix
 KENLM_DIR ?= data/lm
 KENLM_ORDER ?= 5
+LM_EXPANDED_DIR ?= data/lm_expanded
+WAXAL_LM_CSV ?= $(GENERALIZATION_DATASET_DIR)/train.csv
 XLSR_1B_GENERALIZATION_MIX_BASE ?= checkpoints/xlsr_1b_generalization_mix
 XLSR_1B_GENERALIZATION_MIX_STEP ?= 24000
 XLSR_1B_GENERALIZATION_MIX_CHECKPOINT ?= $(XLSR_1B_GENERALIZATION_MIX_BASE)/checkpoint-$(XLSR_1B_GENERALIZATION_MIX_STEP)
@@ -64,7 +66,7 @@ XLSR_1B_GENERALIZATION_MIX_VALID ?= outputs/predictions/xlsr_1b_generalization_m
 RAW_ARG_ROUTING := $(if $(RAW_DIR),--raw-dir "$(RAW_DIR)",)
 UV_RUN := uv run $(if $(WAXAL_NO_SYNC),--no-sync,)
 
-.PHONY: analyze-routing-inputs routed-fallback-validation routed-fallback-submission model-zoo-routing-validation model-zoo-routed-submission build-waxal-kenlm xlsr-generalization-mix-validation-beam xlsr-generalization-mix-validation-lin-beam-lm xlsr-generalization-mix-validation-lug-beam-lm xlsr-generalization-mix-validation-sna-beam-lm xlsr-generalization-mix-validation-beam-lm eval-xlsr-generalization-mix-beam-lm xlsr-generalization-mix-test-lin-beam-lm xlsr-generalization-mix-test-lug-beam-lm xlsr-generalization-mix-test-sna-beam-lm xlsr-generalization-mix-test-beam-lm train-xlsr-1b-generalization-mix-smoke train-xlsr-1b-generalization-mix xlsr-1b-generalization-mix-validation eval-xlsr-1b-generalization-mix sweep-kenlm-params no-metadata-validation audit-audio-text clean-trim-audio-smoke clean-trim-audio push-clean-dataset train-xlsr-300m-clean-audio-smoke train-xlsr-300m-clean-audio train-xlsr-300m-clean-audio-plus-medium train-xlsr-1b-clean-audio train-xlsr-1b-clean-audio-plus-medium
+.PHONY: analyze-routing-inputs routed-fallback-validation routed-fallback-submission model-zoo-routing-validation model-zoo-routed-submission build-waxal-kenlm xlsr-generalization-mix-validation-beam xlsr-generalization-mix-validation-lin-beam-lm xlsr-generalization-mix-validation-lug-beam-lm xlsr-generalization-mix-validation-sna-beam-lm xlsr-generalization-mix-validation-beam-lm eval-xlsr-generalization-mix-beam-lm xlsr-generalization-mix-test-lin-beam-lm xlsr-generalization-mix-test-lug-beam-lm xlsr-generalization-mix-test-sna-beam-lm xlsr-generalization-mix-test-beam-lm train-xlsr-1b-generalization-mix-smoke train-xlsr-1b-generalization-mix xlsr-1b-generalization-mix-validation eval-xlsr-1b-generalization-mix sweep-kenlm-params collect-lm-text collect-lm-text-capped sweep-kenlm-params-expanded no-metadata-validation audit-audio-text clean-trim-audio-smoke clean-trim-audio push-clean-dataset train-xlsr-300m-clean-audio-smoke train-xlsr-300m-clean-audio train-xlsr-300m-clean-audio-plus-medium train-xlsr-1b-clean-audio train-xlsr-1b-clean-audio-plus-medium
 
 audit:
 	$(UV_RUN) scripts/audit_data.py $(RAW_ARG) --output outputs/data_audit.json
@@ -376,6 +378,15 @@ eval-xlsr-1b-generalization-mix:
 
 sweep-kenlm-params:
 	$(UV_RUN) scripts/sweep_kenlm_decode_params.py --checkpoint "$(XLSR_GENERALIZATION_MIX_CHECKPOINT)" --dataset-dir "$(GENERALIZATION_DATASET_DIR)" --kenlm-dir "$(KENLM_DIR)" --order "$(KENLM_ORDER)" --output outputs/analysis/kenlm_alpha_beta_sweep.json
+
+collect-lm-text:
+	$(UV_RUN) scripts/collect_lm_text.py --csv "$(WAXAL_LM_CSV)" --output-dir "$(LM_EXPANDED_DIR)" --order "$(KENLM_ORDER)" --overwrite
+
+collect-lm-text-capped:
+	$(UV_RUN) scripts/collect_lm_text.py --csv "$(WAXAL_LM_CSV)" --output-dir "$(LM_EXPANDED_DIR)" --order "$(KENLM_ORDER)" --max-lines-per-source 60000 --waxal-repeat 2 --overwrite
+
+sweep-kenlm-params-expanded:
+	$(UV_RUN) scripts/sweep_kenlm_decode_params.py --checkpoint "$(XLSR_GENERALIZATION_MIX_CHECKPOINT)" --dataset-dir "$(GENERALIZATION_DATASET_DIR)" --kenlm-dir "$(LM_EXPANDED_DIR)" --order "$(KENLM_ORDER)" --output outputs/analysis/kenlm_alpha_beta_sweep_expanded.json
 
 no-metadata-validation:
 	$(UV_RUN) scripts/run_no_metadata_pipeline.py --checkpoint "$(XLSR_GENERALIZATION_MIX_CHECKPOINT)" --dataset-dir "$(GENERALIZATION_DATASET_DIR)" --split validation --kenlm-dir "$(KENLM_DIR)" --order "$(KENLM_ORDER)" --output-predictions outputs/predictions/no_metadata_validation.csv --report outputs/analysis/no_metadata_validation_report.json

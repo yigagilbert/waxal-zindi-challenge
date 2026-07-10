@@ -440,6 +440,30 @@ def prepare_salt(args: argparse.Namespace) -> list[Any]:
     return [safe_select(salt, args.salt_max, args.seed)]
 
 
+# Verified per-source on 2026-07-09 (see docs/LINGALA_100HRS_PROPOSED_README.md):
+# Afrivoice CC-BY-4.0, LRSC CC BY 4.0 (DOI 10.17632/28x8tc9n9k.1), FLEURS CC-BY-4.0.
+# 'lingala_tts' rows have unknown provenance/license and are always excluded.
+ALLOWED_LINGALA_100HRS_SOURCES = {"Afrivoice", "LRSC", "fleurs"}
+
+
+def waxal_lingala_texts(waxal_dataset_dir: Path) -> set[str]:
+    """Normalized Lingala transcripts from WAXAL train AND validation metadata."""
+    texts: set[str] = set()
+    for name in ("train.csv", "validation.csv"):
+        path = waxal_dataset_dir / name
+        if not path.exists():
+            print(f"WARNING: {path} missing; text-overlap dedup will be incomplete.")
+            continue
+        _, rows, _ = read_csv_dicts(path)
+        for row in rows:
+            if (row.get("language") or "") != "lin":
+                continue
+            normalized = normalize_text(row.get("Target") or row.get("transcription") or "", "language_safe")
+            if normalized:
+                texts.add(normalized)
+    return texts
+
+
 def prepare_lingala_100hrs(args: argparse.Namespace) -> list[Any]:
     from datasets import concatenate_datasets
 
@@ -447,9 +471,12 @@ def prepare_lingala_100hrs(args: argparse.Namespace) -> list[Any]:
         return []
     if not args.allow_unverified_lingala_100hrs:
         raise ValueError(
-            "--include-lingala-100hrs requires --allow-unverified-lingala-100hrs because "
-            "the dataset card has no dataset-level license and sampled audit found WAXAL text overlap."
+            "--include-lingala-100hrs requires --allow-unverified-lingala-100hrs as an explicit opt-in. "
+            "Per-source licenses were verified CC-BY-4.0 on 2026-07-09; unknown 'lingala_tts' rows and "
+            "WAXAL train/validation text overlaps are excluded automatically below."
         )
+    overlap_texts = waxal_lingala_texts(args.waxal_dataset_dir)
+    print(f"Lingala_100hrs dedup set: {len(overlap_texts)} WAXAL lin train+validation transcripts")
     datasets = []
     for split in args.external_splits:
         try:
@@ -457,6 +484,23 @@ def prepare_lingala_100hrs(args: argparse.Namespace) -> list[Any]:
         except Exception as exc:
             print(f"WARNING: failed to load Lingala_100hrs split={split}: {type(exc).__name__}: {exc}")
             continue
+        rows_loaded = len(ds)
+        if "source" in ds.column_names:
+            ds = ds.filter(
+                lambda source: source in ALLOWED_LINGALA_100HRS_SOURCES,
+                input_columns=["source"],
+                desc=f"Lingala_100hrs {split}: dropping non-verified sources",
+            )
+        rows_after_source = len(ds)
+        ds = ds.filter(
+            lambda text, overlap=overlap_texts: normalize_text(str(text or ""), "language_safe") not in overlap,
+            input_columns=["text"],
+            desc=f"Lingala_100hrs {split}: dropping WAXAL text overlaps",
+        )
+        print(
+            f"Lingala_100hrs {split}: {rows_loaded} loaded -> {rows_after_source} after source filter "
+            f"-> {len(ds)} after WAXAL-overlap dedup"
+        )
         datasets.append(
             standardize_dataset(
                 ds,
@@ -464,8 +508,8 @@ def prepare_lingala_100hrs(args: argparse.Namespace) -> list[Any]:
                 source_dataset="KasuleTrevor/Lingala_100hrs",
                 source_split=split,
                 source_language="lin",
-                source_license="UNKNOWN_DATASET_LEVEL_LICENSE",
-                source_risk="unverified_external_sources_possible_waxal_text_overlap",
+                source_license="CC-BY-4.0 (per-source Afrivoice/LRSC/FLEURS, verified 2026-07-09)",
+                source_risk="external_ccby_deduped_vs_waxal_lin_train_and_validation",
                 id_prefix="lingala100",
                 sample_rate=args.sample_rate,
                 skip_duration=args.skip_duration,
@@ -542,8 +586,8 @@ def main() -> None:
             {
                 "source": "KasuleTrevor/Lingala_100hrs",
                 "rows": sum(len(part) for part in lingala_parts),
-                "license": "UNKNOWN_DATASET_LEVEL_LICENSE",
-                "risk": "explicitly included with --allow-unverified-lingala-100hrs",
+                "license": "CC-BY-4.0 per source (Afrivoice/LRSC/FLEURS, verified 2026-07-09)",
+                "risk": "lingala_tts rows and WAXAL lin train/validation text overlaps excluded at ingestion",
             }
         )
         external_parts.extend(lingala_parts)
@@ -616,7 +660,7 @@ def main() -> None:
             "waxal": "official challenge train/validation/test audio only; no public test labels used",
             "fleurs": "public CC-BY-4.0 external data",
             "salt": "public CC-BY-SA-4.0 external Luganda data",
-            "lingala_100hrs": "not included unless explicit unverified flag is passed",
+            "lingala_100hrs": "explicit opt-in; per-source CC-BY-4.0 verified 2026-07-09; lingala_tts rows and WAXAL lin train/validation text overlaps excluded at ingestion",
         },
     }
     json_dump(summary, args.output_dir / "generalization_mix_report.json")

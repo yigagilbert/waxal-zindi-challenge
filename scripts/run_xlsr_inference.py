@@ -27,6 +27,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", default=None)
     parser.add_argument("--decoder-mode", choices=["greedy", "beam", "beam_lm"], default="greedy")
     parser.add_argument("--kenlm-model", type=Path, default=None)
+    parser.add_argument(
+        "--unigrams-file",
+        type=Path,
+        default=None,
+        help="Word list for pyctcdecode lexicon scoring. Auto-derived from the KenLM corpus (e.g. data/lm/lin.txt) when omitted.",
+    )
     parser.add_argument("--beam-width", type=int, default=100)
     parser.add_argument("--alpha", type=float, default=0.5)
     parser.add_argument("--beta", type=float, default=1.5)
@@ -119,6 +125,26 @@ def build_ctc_labels(tokenizer) -> list[str]:
     return labels
 
 
+def load_unigrams(kenlm_model: Path | None, unigrams_file: Path | None) -> list[str] | None:
+    """Load lexicon words for pyctcdecode; auto-derive from the LM corpus file."""
+    path = unigrams_file
+    if path is None and kenlm_model is not None:
+        # data/lm/lin_5gram.binary -> data/lm/lin.txt (corpus written by build_kenlm_decoders.py)
+        candidate = kenlm_model.with_name(kenlm_model.name.split("_")[0] + ".txt")
+        if candidate.exists():
+            path = candidate
+    if path is None:
+        return None
+    if not path.exists():
+        raise FileNotFoundError(f"Unigrams file not found: {path}")
+    words: set[str] = set()
+    with path.open(encoding="utf-8") as f:
+        for line in f:
+            words.update(line.split())
+    print(f"Loaded {len(words)} unigrams from {path}")
+    return sorted(words)
+
+
 def build_pyctcdecode_decoder(processor, args: argparse.Namespace):
     if args.decoder_mode == "greedy":
         return None
@@ -128,7 +154,12 @@ def build_pyctcdecode_decoder(processor, args: argparse.Namespace):
         raise FileNotFoundError(f"KenLM model not found: {args.kenlm_model}")
 
     try:
+        import logging
+
         from pyctcdecode import build_ctcdecoder
+
+        # the multi-char <s>/</s>/[UNK] labels are intentional; silence the repeat warnings
+        logging.getLogger("pyctcdecode").setLevel(logging.ERROR)
     except ImportError as exc:
         raise RuntimeError(
             "pyctcdecode is required for --decoder-mode beam/beam_lm. "
@@ -138,6 +169,7 @@ def build_pyctcdecode_decoder(processor, args: argparse.Namespace):
     return build_ctcdecoder(
         build_ctc_labels(processor.tokenizer),
         kenlm_model_path=str(args.kenlm_model) if args.kenlm_model else None,
+        unigrams=load_unigrams(args.kenlm_model, getattr(args, "unigrams_file", None)),
         alpha=args.alpha,
         beta=args.beta,
     )

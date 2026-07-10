@@ -38,8 +38,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--languages", nargs="*", default=["lin", "lug", "sna"])
     parser.add_argument("--kenlm-dir", type=Path, default=Path("data/lm"))
     parser.add_argument("--order", type=int, default=5)
-    parser.add_argument("--alphas", type=float, nargs="*", default=[0.2, 0.4, 0.6, 0.8, 1.0])
-    parser.add_argument("--betas", type=float, nargs="*", default=[0.5, 1.0, 1.5, 2.0])
+    parser.add_argument("--alphas", type=float, nargs="*", default=[0.4, 0.5, 0.6, 0.7, 0.8])
+    parser.add_argument("--betas", type=float, nargs="*", default=[-0.5, 0.0, 0.25, 0.5, 1.0])
     parser.add_argument("--beam-width", type=int, default=100)
     parser.add_argument("--max-samples-per-language", type=int, default=800)
     parser.add_argument("--batch-size", type=int, default=4)
@@ -81,10 +81,15 @@ def compute_language_logits(model, processor, ds, *, batch_size: int, device):
 
 def main() -> None:
     args = parse_args()
+    import logging
+
     import numpy as np
     import torch
     from pyctcdecode import build_ctcdecoder
     from transformers import AutoModelForCTC
+
+    # multi-char <s>/</s>/[UNK] labels are intentional; silence per-decoder warnings
+    logging.getLogger("pyctcdecode").setLevel(logging.ERROR)
 
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
     vocab_path = resolve_vocab_path(args.checkpoint, args.vocab_path)
@@ -112,6 +117,13 @@ def main() -> None:
         if not kenlm_path.exists():
             print(f"WARNING: {kenlm_path} missing; skipping {language}")
             continue
+        corpus_path = args.kenlm_dir / f"{language}.txt"
+        unigrams = None
+        if corpus_path.exists():
+            unigrams = sorted(set(corpus_path.read_text(encoding="utf-8").split()))
+            print(f"{language}: {len(unigrams)} unigrams from {corpus_path}")
+        else:
+            print(f"WARNING: {corpus_path} missing; sweeping without unigrams (lexicon scoring disabled)")
         ds = full_ds.filter(lambda lang, want=language: lang == want, input_columns=["language"])
         if args.max_samples_per_language and len(ds) > args.max_samples_per_language:
             ds = ds.shuffle(seed=42).select(range(args.max_samples_per_language))
@@ -137,7 +149,9 @@ def main() -> None:
         best = None
         for alpha in args.alphas:
             for beta in args.betas:
-                decoder = build_ctcdecoder(labels, kenlm_model_path=str(kenlm_path), alpha=alpha, beta=beta)
+                decoder = build_ctcdecoder(
+                    labels, kenlm_model_path=str(kenlm_path), unigrams=unigrams, alpha=alpha, beta=beta
+                )
                 preds = [
                     normalize_text(
                         clean_ctc_prediction(

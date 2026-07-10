@@ -4,9 +4,30 @@ This project is being run as a competition solution for the Zindi Google WAXAL A
 
 Source checked: https://zindi.africa/competitions/google-waxal-asr-challenge on 2026-07-03.
 
+## UNRESOLVED RULE CONFLICT (found 2026-07-09) — external data
+
+The Info/Rules tab and the Data tab directly contradict each other on external data:
+
+- **Info tab:** "You may use only the datasets specified for this challenge."
+- **Data tab, Phase 1 About:** "Participants may supplement the provided challenge
+  data with other publicly available open-source speech or language datasets. Any
+  external datasets used must be publicly accessible, legally licensed for research
+  or development, and disclosed in the final solution documentation."
+
+This matters directly: our submitted champion model uses FLEURS (CC-BY-4.0) and
+Sunbird/SALT (CC-BY-SA-4.0), which are external. Under the Info-tab reading that is
+non-compliant; under the Data-tab reading it is allowed with disclosure (which we do).
+
+ACTION REQUIRED before final code review: post in the Zindi discussion asking for an
+official ruling quoting both lines, and save the response (screenshot + paste here).
+Until then, keep full disclosure of every external source and license in this file so
+the solution is defensible under the permissive reading. The Data-tab language is
+Phase-specific and more recent, so it is the more likely authoritative statement, but
+do not rely on that without written confirmation.
+
 ## Exact Rule Quotes
 
-External datasets:
+External datasets (Info tab — conflicts with Data tab above):
 
 > "You may use only the datasets specified for this challenge."
 
