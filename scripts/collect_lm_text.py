@@ -47,16 +47,18 @@ HF_SOURCES = [
     {"dataset": "google/fleurs", "config": "sn_zw", "language": "sna", "license": "CC-BY-4.0"},
     {"dataset": "Sunbird/salt", "config": "multispeaker-lug", "language": "lug",
      "license": "CC-BY-SA-4.0", "splits": ["train", "dev", "test"]},
-    {"dataset": "DigitalUmuganda/Afrivoice", "config": "Lingala", "language": "lin",
-     "license": "CC-BY-4.0", "gated": True,
-     "language_filter": {"column": "language", "values": ["lin", "Lingala", "lingala", "ln"]}},
-    {"dataset": "DigitalUmuganda/Afrivoice", "config": "Shona", "language": "sna",
-     "license": "CC-BY-4.0", "gated": True,
-     "language_filter": {"column": "language", "values": ["sna", "Shona", "shona", "sn"]}},
-    {"dataset": "yigagilbert/luganda-speech-cv-yogera", "config": "makerere-yogera-lug",
-     "language": "lug", "license": "CC-BY-SA-4.0", "gated": True},
-    {"dataset": "yigagilbert/luganda-speech-cv-yogera", "config": "common-voice-sample-packed-lug",
-     "language": "lug", "license": "CC0-1.0", "gated": True},
+    # Luganda: user's cleaned parquet repo with a standard `text` column, loaded by
+    # data_files glob per subset (robust to whether HF configs are defined).
+    {"dataset": "yigagilbert/luganda-speech-cv-yogera-filtered", "config": "lug_commonvoice",
+     "data_files": "lug_commonvoice/*.parquet", "splits": ["train"], "language": "lug",
+     "license": "CC0-1.0 (Common Voice)", "gated": True},
+    {"dataset": "yigagilbert/luganda-speech-cv-yogera-filtered", "config": "lug_makerereradio",
+     "data_files": "lug_makerereradio/*.parquet", "splits": ["train"], "language": "lug",
+     "license": "CC-BY-SA-4.0 (Makerere Radio)", "gated": True},
+    # Afrivoice (Shona/Lingala) is a raw file dump (JPEG+WAV+transcription in language
+    # folders), not a load_dataset-able repo, and only partially transcribed. Handle it
+    # separately once we know the transcript-file format (see diagnostic in chat) or once
+    # a cleaned `text`-column parquet mirror exists (like the Luganda repo above).
 ]
 
 DEFAULT_SPLITS = ["train", "validation", "test"]
@@ -150,7 +152,10 @@ def harvest_hf_source(src: dict, languages: set[str], args: argparse.Namespace):
     total = 0
     for split in src.get("splits", DEFAULT_SPLITS):
         try:
-            ds = load_dataset(src["dataset"], src.get("config"), split=split, streaming=True)
+            if src.get("data_files"):
+                ds = load_dataset(src["dataset"], data_files=src["data_files"], split=split, streaming=True)
+            else:
+                ds = load_dataset(src["dataset"], src.get("config"), split=split, streaming=True)
         except Exception as exc:
             print(f"  skip {src['dataset']}:{src.get('config')}/{split}: {type(exc).__name__}: {exc}")
             continue
