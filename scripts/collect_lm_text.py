@@ -162,14 +162,24 @@ def harvest_hf_source(src: dict, languages: set[str], args: argparse.Namespace):
         except Exception as exc:
             print(f"  skip {src['dataset']}:{src.get('config')}/{split}: {type(exc).__name__}: {exc}")
             continue
+        # Drop audio columns so nothing is decoded (avoids the torchcodec dependency
+        # and audio bandwidth). ds.column_names is None in streaming on some datasets
+        # versions, so identify audio columns from ds.features (reliable).
+        audio_cols: set[str] = set()
+        feats = getattr(ds, "features", None)
+        if feats:
+            for name, feat in feats.items():
+                if "audio" in name.lower() or feat.__class__.__name__ == "Audio":
+                    audio_cols.add(name)
         try:
-            cols = list(ds.column_names) if ds.column_names else []
+            for name in (ds.column_names or []):
+                if "audio" in name.lower():
+                    audio_cols.add(name)
         except Exception:
-            cols = []
-        drop = [c for c in cols if "audio" in c.lower()]  # never decode audio
-        if drop:
+            pass
+        if audio_cols:
             try:
-                ds = ds.remove_columns(drop)
+                ds = ds.remove_columns(list(audio_cols))
             except Exception:
                 pass
         n = 0
@@ -219,23 +229,44 @@ def harvest_afrivoice_manifests(src: dict, args: argparse.Namespace):
         print(f"  skip Afrivoice {folder}: cannot list files ({type(exc).__name__}: {exc})")
         return [], None
     manifests = [f for f in files if f.startswith(f"{folder}/") and f.endswith(".json")]
+
+    def load_records(path: str) -> list[dict]:
+        """Manifests are JSON Lines (one record per line); tolerate plain JSON too."""
+        with open(path, encoding="utf-8") as handle:
+            content = handle.read()
+        try:
+            data = json.loads(content)
+            return data if isinstance(data, list) else [data]
+        except json.JSONDecodeError:
+            records = []
+            for line in content.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    records.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+            return records
+
     lines: list[str] = []
     read = 0
     for manifest in manifests:
         try:
             path = hf_hub_download(src["dataset"], manifest, repo_type="dataset")
-            data = json.load(open(path, encoding="utf-8"))
+            records = load_records(path)
         except Exception as exc:
             print(f"  skip {manifest}: {type(exc).__name__}: {exc}")
             continue
-        transcription = data.get("transcription")
-        items = transcription if isinstance(transcription, list) else [transcription]
-        for value in items:
-            if value is None or not str(value).strip():
-                continue
-            norm = normalize_text(str(value), args.normalization)
-            if len(norm) >= args.min_chars:
-                lines.append(norm)
+        for record in records:
+            transcription = record.get("transcription") if isinstance(record, dict) else None
+            items = transcription if isinstance(transcription, list) else [transcription]
+            for value in items:
+                if value is None or not str(value).strip():
+                    continue
+                norm = normalize_text(str(value), args.normalization)
+                if len(norm) >= args.min_chars:
+                    lines.append(norm)
         read += 1
     print(f"  Afrivoice/{folder}: {read} manifests -> {len(lines)} transcript lines")
     provenance = {
