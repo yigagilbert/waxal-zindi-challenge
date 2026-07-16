@@ -7,7 +7,9 @@ sample keyed like 'audio_XXXX'), and transcripts live in the JSON-Lines manifest
 audio key and emits rows with audio@16kHz + transcription + source tags, ready to
 concatenate into the clean-audio superset and run through clean_and_trim_audio_dataset.
 
-Needs torchcodec for audio decode (Part B wants the audio): `pip install torchcodec`.
+Decodes audio with soundfile + librosa (no torchcodec / no datasets Audio decoding),
+so it is robust to the box's Python-env churn. Downloads the tar.xz shards, extracts
+the wav members with tarfile, and joins them to the manifest transcripts on the key.
 
 Run a capped smoke first (--max-per-language 50) to confirm the manifest<->wav join
 before the full multi-GB download.
@@ -74,42 +76,76 @@ def load_manifest_map(repo: str, folder: str) -> tuple[dict[str, str], int]:
     return mapping, len(manifests)
 
 
-def standardized_rows(repo: str, folder: str, language: str, mapping: dict[str, str], args: argparse.Namespace):
-    """Yield standardized rows joining shard audio with manifest transcripts."""
-    from datasets import Audio, load_dataset
+AUDIO_EXTS = (".wav", ".flac", ".ogg", ".mp3", ".opus", ".m4a")
 
-    url = f"hf://datasets/{repo}/{folder}/audio_shards/*.tar.xz"
-    ds = load_dataset("webdataset", data_files={"train": url}, split="train", streaming=True)
-    ds = ds.cast_column("wav", Audio(sampling_rate=args.sample_rate))
+
+def standardized_rows(repo: str, folder: str, language: str, mapping: dict[str, str], args: argparse.Namespace):
+    """Yield standardized rows joining shard audio (tarfile+soundfile) with transcripts."""
+    import io
+    import tarfile
+
+    import numpy as np
+    import soundfile as sf
+    from huggingface_hub import HfApi, hf_hub_download
+
+    try:
+        import librosa
+    except ImportError:
+        librosa = None
+
+    api = HfApi()
+    files = api.list_repo_files(repo, repo_type="dataset")
+    shards = sorted(f for f in files if f.startswith(f"{folder}/audio_shards/") and f.endswith(".tar.xz"))
     matched = 0
     unmatched = 0
-    for row in ds:
-        key = row.get("__key__", "")
-        transcription = mapping.get(key) or mapping.get(Path(key).stem)
-        if not transcription:
-            unmatched += 1
-            if unmatched <= 5:
-                print(f"  [{folder}] unmatched audio key: {key!r}")
-            continue
-        text = normalize_text(transcription, args.normalization)
-        if not text:
-            continue
-        audio = row["wav"]  # {'array': np.ndarray, 'sampling_rate': sr}
-        duration = float(len(audio["array"]) / audio["sampling_rate"]) if audio.get("sampling_rate") else -1.0
-        yield {
-            "ID": f"afrivoice_{language}_{key}",
-            "audio": {"array": audio["array"], "sampling_rate": audio["sampling_rate"]},
-            "transcription": text,
-            "language": language,
-            "original_split": "external_train",
-            "duration": round(duration, 3),
-            "source_dataset": "DigitalUmuganda/Afrivoice",
-            "source_split": folder,
-            "source_language": language,
-            "source_license": "CC-BY-4.0",
-            "source_risk": "external_ccby_image_description_speech",
-        }
-        matched += 1
+    for shard in shards:
+        path = hf_hub_download(repo, shard, repo_type="dataset")
+        with tarfile.open(path, "r:xz") as tar:
+            for member in tar:
+                if not member.isfile() or not member.name.lower().endswith(AUDIO_EXTS):
+                    continue
+                key = Path(member.name).stem  # 'audio_XXXX'
+                transcription = mapping.get(key) or mapping.get(member.name)
+                if not transcription:
+                    unmatched += 1
+                    if unmatched <= 5:
+                        print(f"  [{folder}] unmatched audio member: {member.name!r}")
+                    continue
+                text = normalize_text(transcription, args.normalization)
+                if not text:
+                    continue
+                handle = tar.extractfile(member)
+                if handle is None:
+                    continue
+                try:
+                    array, sr = sf.read(io.BytesIO(handle.read()), dtype="float32", always_2d=False)
+                except Exception as exc:
+                    print(f"  [{folder}] decode failed for {member.name}: {type(exc).__name__}: {exc}")
+                    continue
+                if getattr(array, "ndim", 1) > 1:
+                    array = array.mean(axis=1)  # to mono
+                if sr != args.sample_rate:
+                    if librosa is None:
+                        print("  librosa required to resample; skipping"); continue
+                    array = librosa.resample(np.asarray(array, dtype=np.float32), orig_sr=sr, target_sr=args.sample_rate)
+                    sr = args.sample_rate
+                array = np.asarray(array, dtype=np.float32)
+                yield {
+                    "ID": f"afrivoice_{language}_{key}",
+                    "audio": {"array": array, "sampling_rate": sr},
+                    "transcription": text,
+                    "language": language,
+                    "original_split": "external_train",
+                    "duration": round(len(array) / sr, 3) if sr else -1.0,
+                    "source_dataset": "DigitalUmuganda/Afrivoice",
+                    "source_split": folder,
+                    "source_language": language,
+                    "source_license": "CC-BY-4.0",
+                    "source_risk": "external_ccby_image_description_speech",
+                }
+                matched += 1
+                if args.max_per_language and matched >= args.max_per_language:
+                    break
         if args.max_per_language and matched >= args.max_per_language:
             break
     print(f"  [{folder}] matched {matched}, unmatched {unmatched} (of {len(mapping)} transcripts)")
