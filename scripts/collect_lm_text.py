@@ -88,6 +88,13 @@ def parse_args() -> argparse.Namespace:
         help="Local text CSV to include (WAXAL anchor etc.). Repeat. Defaults to the generalization-mix train.csv.",
     )
     parser.add_argument("--language-column", default="language")
+    parser.add_argument(
+        "--merge-corpus-dir",
+        type=Path,
+        action="append",
+        default=None,
+        help="Existing KenLM corpus dir; its <lang>.txt lines are merged in (e.g. the champion's data/lm to reuse already-harvested WAXAL+FLEURS+SALT text). Repeat.",
+    )
     parser.add_argument("--waxal-repeat", type=int, default=1, help="Repeat WAXAL (local CSV or --waxal-from-hf) lines N times to keep the LM domain-anchored.")
     parser.add_argument("--waxal-from-hf", action="store_true", help="Pull the WAXAL train-text anchor from google/WaxalNLP (use when no local train.csv, e.g. Colab).")
     parser.add_argument("--skip-hf", action="store_true", help="Only use local CSVs, no Hugging Face pulls.")
@@ -346,6 +353,19 @@ def main() -> None:
                 by_language[src["language"]].extend(lines)
             if prov:
                 provenance.append(prov)
+
+    for merge_dir in (args.merge_corpus_dir or []):
+        langs = languages or set(by_language)
+        for language in sorted(langs):
+            corpus_path = merge_dir / f"{language}.txt"
+            if not corpus_path.exists():
+                print(f"Merge: {corpus_path} not found; skipping")
+                continue
+            merged = [line for line in corpus_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+            by_language[language].extend(merged)
+            provenance.append({"source": str(corpus_path), "kind": "merged_existing_corpus",
+                               "language": language, "license": "see_original_sources", "lines": len(merged)})
+            print(f"Merged {len(merged)} existing lines from {corpus_path}")
 
     ensure_dir(args.output_dir)
     summary: dict = {"output_dir": str(args.output_dir), "order": args.order, "normalization": args.normalization,
