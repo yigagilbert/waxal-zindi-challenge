@@ -145,6 +145,31 @@ def harvest_local_csvs(csv_paths: list[Path], language_column: str, languages: s
     return by_language, provenance
 
 
+def _audio_column_names(src: dict, ds) -> list[str]:
+    """Identify audio columns to drop before iterating (so no torchcodec decode)."""
+    names: set[str] = set()
+
+    def scan(features):
+        for name, feat in (features or {}).items():
+            if "audio" in name.lower() or feat.__class__.__name__ == "Audio":
+                names.add(name)
+
+    # 1) authoritative: the dataset builder's schema (always populated, non-streaming)
+    try:
+        from datasets import load_dataset_builder
+
+        kwargs = {"data_files": src["data_files"]} if src.get("data_files") else {}
+        config = None if src.get("data_files") else src.get("config")
+        scan(load_dataset_builder(src["dataset"], config, **kwargs).info.features)
+    except Exception:
+        pass
+    # 2) streaming features, if the version exposes them
+    scan(getattr(ds, "features", None))
+    # 3) last resort: the column is almost always literally "audio"
+    names.add("audio")
+    return list(names)
+
+
 def harvest_hf_source(src: dict, languages: set[str], args: argparse.Namespace):
     from datasets import load_dataset
 
@@ -162,24 +187,14 @@ def harvest_hf_source(src: dict, languages: set[str], args: argparse.Namespace):
         except Exception as exc:
             print(f"  skip {src['dataset']}:{src.get('config')}/{split}: {type(exc).__name__}: {exc}")
             continue
-        # Drop audio columns so nothing is decoded (avoids the torchcodec dependency
-        # and audio bandwidth). ds.column_names is None in streaming on some datasets
-        # versions, so identify audio columns from ds.features (reliable).
-        audio_cols: set[str] = set()
-        feats = getattr(ds, "features", None)
-        if feats:
-            for name, feat in feats.items():
-                if "audio" in name.lower() or feat.__class__.__name__ == "Audio":
-                    audio_cols.add(name)
-        try:
-            for name in (ds.column_names or []):
-                if "audio" in name.lower():
-                    audio_cols.add(name)
-        except Exception:
-            pass
-        if audio_cols:
+        # Drop audio columns so nothing decodes (avoids the torchcodec dependency and
+        # audio bandwidth). In streaming, ds.features/ds.column_names can be None on
+        # some datasets versions, so read the schema from the dataset builder, which is
+        # always populated. Fall back to streaming features and the literal "audio".
+        audio_cols = _audio_column_names(src, ds)
+        for col in audio_cols:
             try:
-                ds = ds.remove_columns(list(audio_cols))
+                ds = ds.remove_columns([col])
             except Exception:
                 pass
         n = 0
