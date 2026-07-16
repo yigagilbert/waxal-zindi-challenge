@@ -57,6 +57,37 @@ def _load_any(path: Path):
     return load_from_disk(str(path))
 
 
+# Defaults for a base WAXAL DatasetDict that predates the source_* schema
+# (e.g. pure data/processed from prepare_dataset, before generalization_mix's align).
+WAXAL_SOURCE_DEFAULTS = {
+    "source_dataset": "waxal",
+    "source_split": "",  # filled from original_split per row below
+    "source_language": "",  # filled from language per row below
+    "source_license": "CC-BY-4.0",
+    "source_risk": "in_domain_waxal",
+}
+
+
+def _ensure_schema(ds, *, is_waxal_base: bool):
+    """Add any missing schema columns. WAXAL base rows get in-domain source_* defaults."""
+    cols = set(ds.column_names)
+    n = len(ds)
+    if "source_split" not in cols and "original_split" in cols:
+        ds = ds.add_column("source_split", list(ds["original_split"]))
+        cols.add("source_split")
+    if "source_language" not in cols and "language" in cols:
+        ds = ds.add_column("source_language", list(ds["language"]))
+        cols.add("source_language")
+    for col in COLUMNS:
+        if col in cols:
+            continue
+        default = WAXAL_SOURCE_DEFAULTS.get(col, "" if col != "duration" else -1.0) if is_waxal_base else (
+            "" if col != "duration" else -1.0)
+        ds = ds.add_column(col, [default] * n)
+        cols.add(col)
+    return ds
+
+
 def _align(ds, template_features):
     """Reorder/cast a single Dataset to the template train features so concatenate works."""
     missing = [c for c in COLUMNS if c not in ds.column_names]
@@ -78,9 +109,12 @@ def main() -> None:
     mix = _load_any(args.waxal_dir)
     if not hasattr(mix, "keys") or "train" not in mix:
         raise SystemExit(f"{args.waxal_dir} did not load a DatasetDict with a 'train' split")
-    train = mix["train"].select_columns(COLUMNS)
+    train = _ensure_schema(mix["train"], is_waxal_base=True).select_columns(COLUMNS)
     template = train.features
-    validation = mix["validation"].select_columns(COLUMNS) if "validation" in mix else None
+    validation = (
+        _ensure_schema(mix["validation"], is_waxal_base=True).select_columns(COLUMNS)
+        if "validation" in mix else None
+    )
     print(f"in-domain WAXAL train: {len(train)} rows | validation: {len(validation) if validation is not None else 0}")
 
     parts = [train]
