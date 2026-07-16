@@ -55,10 +55,13 @@ HF_SOURCES = [
     {"dataset": "yigagilbert/luganda-speech-cv-yogera-filtered", "config": "lug_makerereradio",
      "data_files": "lug_makerereradio/*.parquet", "splits": ["train"], "language": "lug",
      "license": "CC-BY-SA-4.0 (Makerere Radio)", "gated": True},
-    # Afrivoice (Shona/Lingala) is a raw file dump (JPEG+WAV+transcription in language
-    # folders), not a load_dataset-able repo, and only partially transcribed. Handle it
-    # separately once we know the transcript-file format (see diagnostic in chat) or once
-    # a cleaned `text`-column parquet mirror exists (like the Luganda repo above).
+    # Afrivoice (Shona/Lingala): WebDataset (audio in tar.xz shards, transcripts in the
+    # small top-level <Lang>/manifest_N.json files). We read TEXT from the manifests only
+    # (no audio download). `transcription` may be a list (shard-level) or a string.
+    {"dataset": "DigitalUmuganda/Afrivoice", "loader": "afrivoice_manifest", "manifest_folder": "Shona",
+     "language": "sna", "license": "CC-BY-4.0", "gated": True},
+    {"dataset": "DigitalUmuganda/Afrivoice", "loader": "afrivoice_manifest", "manifest_folder": "Lingala",
+     "language": "lin", "license": "CC-BY-4.0", "gated": True},
 ]
 
 DEFAULT_SPLITS = ["train", "validation", "test"]
@@ -196,6 +199,52 @@ def harvest_hf_source(src: dict, languages: set[str], args: argparse.Namespace):
     return lines, provenance
 
 
+def harvest_afrivoice_manifests(src: dict, args: argparse.Namespace):
+    """Read Afrivoice transcripts from the small per-language JSON manifests only.
+
+    Downloads no audio. `transcription` may be a list (shard-level manifest) or a
+    single string; both are handled. Empty/absent transcripts ('when available')
+    are skipped.
+    """
+    import json
+
+    from huggingface_hub import HfApi, hf_hub_download
+
+    lang = src["language"]
+    folder = src["manifest_folder"]
+    api = HfApi()
+    try:
+        files = api.list_repo_files(src["dataset"], repo_type="dataset")
+    except Exception as exc:
+        print(f"  skip Afrivoice {folder}: cannot list files ({type(exc).__name__}: {exc})")
+        return [], None
+    manifests = [f for f in files if f.startswith(f"{folder}/") and f.endswith(".json")]
+    lines: list[str] = []
+    read = 0
+    for manifest in manifests:
+        try:
+            path = hf_hub_download(src["dataset"], manifest, repo_type="dataset")
+            data = json.load(open(path, encoding="utf-8"))
+        except Exception as exc:
+            print(f"  skip {manifest}: {type(exc).__name__}: {exc}")
+            continue
+        transcription = data.get("transcription")
+        items = transcription if isinstance(transcription, list) else [transcription]
+        for value in items:
+            if value is None or not str(value).strip():
+                continue
+            norm = normalize_text(str(value), args.normalization)
+            if len(norm) >= args.min_chars:
+                lines.append(norm)
+        read += 1
+    print(f"  Afrivoice/{folder}: {read} manifests -> {len(lines)} transcript lines")
+    provenance = {
+        "source": src["dataset"], "config": f"manifest:{folder}", "kind": "afrivoice_manifest_text_only",
+        "language": lang, "license": src["license"], "gated": True, "lines": len(lines), "manifests": read,
+    }
+    return lines, provenance
+
+
 def build_kenlm(corpus: Path, language: str, args: argparse.Namespace) -> None:
     lmplz = shutil.which("lmplz")
     build_binary = shutil.which("build_binary")
@@ -240,8 +289,13 @@ def main() -> None:
             if key in skip or src["dataset"] in skip:
                 print(f"Skipping {key} (requested)")
                 continue
+            if languages and src["language"] not in languages:
+                continue
             print(f"Harvesting {key} ({src['language']}, {src['license']}{', GATED' if src.get('gated') else ''}) ...")
-            lines, prov = harvest_hf_source(src, languages, args)
+            if src.get("loader") == "afrivoice_manifest":
+                lines, prov = harvest_afrivoice_manifests(src, args)
+            else:
+                lines, prov = harvest_hf_source(src, languages, args)
             if lines:
                 by_language[src["language"]].extend(lines)
             if prov:
