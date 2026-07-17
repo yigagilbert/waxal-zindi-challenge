@@ -184,11 +184,17 @@ def prepare_hf_dataset(
             if not ids:
                 continue
             hf_split = split_name
-            print(f"Loading google/WaxalNLP {LANGUAGE_CONFIGS[lang]} split={hf_split} for {len(ids)} Zindi IDs")
+            # Load ONLY this split's parquet shards. Selecting by the HF config
+            # (LANGUAGE_CONFIGS[lang]) makes the parquet builder resolve+download
+            # every split — including the huge `unlabeled` split (70k-85k clips) we
+            # never use — which fills the disk. Restricting data_files to the split
+            # pattern downloads just train/validation/test (~18GB total, not ~250GB).
+            data_files = f"data/ASR/{lang}/{lang}-{hf_split}-*.parquet"
+            print(f"Loading google/WaxalNLP {LANGUAGE_CONFIGS[lang]} split={hf_split} ({data_files}) for {len(ids)} Zindi IDs")
             ds = load_dataset(
                 "google/WaxalNLP",
-                LANGUAGE_CONFIGS[lang],
-                split=hf_split,
+                data_files=data_files,
+                split="train",
                 streaming=streaming,
             )
             ds = ds.cast_column("audio", Audio(sampling_rate=sample_rate))
