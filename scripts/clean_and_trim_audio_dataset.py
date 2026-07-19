@@ -93,6 +93,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num-proc", type=int, default=8)
     parser.add_argument("--max-samples-per-split", type=int, default=None, help="Smoke-test cap.")
     parser.add_argument(
+        "--extra-train-dataset",
+        type=Path,
+        action="append",
+        default=None,
+        help=(
+            "Standardized external Dataset dir (holds hf_dataset) to concatenate into the "
+            "TRAIN split before cleaning. Repeat. Lets externals be added without materializing "
+            "a separate merged copy on disk (they are memory-mapped, then cleaned in one pass). "
+            "Validation/test are left untouched (in-domain only)."
+        ),
+    )
+    parser.add_argument(
         "--preprocessing-version",
         default=PREPROCESSING_VERSION,
         help="Version tag stamped on every row (bump when the source mix or rules change, e.g. clean_audio_v2 once Lingala_100hrs is added).",
@@ -291,6 +303,29 @@ def main() -> None:
     from datasets import DatasetDict, load_from_disk
 
     dataset_dict = load_from_disk(args.dataset_dir / "hf_dataset")
+
+    # Fold external standardized datasets into TRAIN (memory-mapped, no intermediate
+    # merged copy on disk). Externals must already carry the same 11-column schema
+    # (ID, audio, transcription, language, original_split, duration, source_*).
+    if args.extra_train_dataset:
+        from datasets import concatenate_datasets
+
+        base_train = dataset_dict["train"]
+        base_cols = base_train.column_names
+        parts = [base_train]
+        for extra_path in args.extra_train_dataset:
+            loaded = load_from_disk(str(extra_path / "hf_dataset")) if (extra_path / "hf_dataset").exists() else load_from_disk(str(extra_path))
+            if hasattr(loaded, "keys"):  # a DatasetDict -> flatten its splits
+                loaded = concatenate_datasets([loaded[k] for k in loaded.keys()])
+            missing = [c for c in base_cols if c not in loaded.column_names]
+            if missing:
+                raise SystemExit(f"{extra_path} missing columns {missing}; got {loaded.column_names}")
+            loaded = loaded.select_columns(base_cols).cast(base_train.features)
+            parts.append(loaded)
+            print(f"  + extra train: {extra_path} (+{len(loaded)} rows)")
+        dataset_dict["train"] = concatenate_datasets(parts)
+        print(f"  train after externals: {len(dataset_dict['train'])} rows")
+
     rows_by_split: dict[str, list[dict]] = {}
     for split in args.splits:
         if split not in dataset_dict:
