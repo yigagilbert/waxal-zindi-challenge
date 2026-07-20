@@ -1,0 +1,55 @@
+run_name: xlsr_300m_champion_recipe_clean_audio_v3
+# CONTROLLED REPRODUCTION of the champion recipe on the cleaner data.
+# Same as configs/xlsr_300m_generalization_mix.yaml (the champion config) EXCEPT:
+#   - data.dataset_dir -> clean_audio_v3 (train split = clean bucket only)
+#   - training_args.output_dir -> a NEW dir (champion checkpoint is never overwritten)
+#   - bf16 instead of fp16 (H100 sm_90 + this box's newer transformers; the only
+#     box-driven deviation, and the one that worked for the continuation run)
+#   - early_stopping added (kill a dead run fast)
+# From BASE XLS-R (not the champion checkpoint) — this is a fresh train, so the CTC
+# vocab is rebuilt from clean_audio_v3 text (same recipe behavior as the champion).
+model:
+  name: facebook/wav2vec2-xls-r-300m
+  freeze_feature_encoder: true
+data:
+  dataset_dir: data/final_combined_clean_audio_dataset   # clean_audio_v3; train = clean bucket (90,301), validation = in-domain WAXAL (4,235)
+  extra_train_splits: []           # clean bucket ONLY (controlled: cleaner data only)
+  train_manifest: null
+  include_medium: false
+  languages: null
+  min_duration: 0.30
+  max_duration: 50.0
+  language_balanced_sampling: true # identical to champion
+  lazy_preprocessing: true
+text:
+  normalization: language_safe     # identical to champion
+evaluation:
+  normalization: language_safe
+tracking:
+  report_to: none
+  local_dir: outputs/experiments
+early_stopping:
+  patience: 6        # 6 evals (=3000 steps at eval_steps 500) with no eval_cer improvement -> stop
+  threshold: 0.001
+training_args:
+  output_dir: checkpoints/xlsr_300m_champion_recipe_clean_audio_v3   # NEW dir; never the champion's
+  per_device_train_batch_size: 2
+  per_device_eval_batch_size: 2
+  gradient_accumulation_steps: 8   # effective batch 16, same as champion
+  learning_rate: 3.0e-4            # SAME as champion (full recipe, not a low-LR continuation)
+  warmup_steps: 2400               # same as champion
+  max_steps: 24000                 # same as champion (proven step count)
+  bf16: true                       # box-driven deviation (H100); fp16 was the champion's on its box
+  fp16: false
+  gradient_checkpointing: true
+  eval_strategy: steps
+  save_strategy: steps
+  save_steps: 500
+  eval_steps: 500
+  logging_steps: 50
+  save_total_limit: 5              # same as champion; load_best_model_at_end keeps the best by eval_cer
+  seed: 42
+  group_by_length: true            # auto-popped under lazy preprocessing (this box's transformers)
+  load_best_model_at_end: true
+  metric_for_best_model: eval_cer
+  greater_is_better: false
