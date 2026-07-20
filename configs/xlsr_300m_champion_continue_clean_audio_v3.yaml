@@ -11,6 +11,7 @@ model:
   # Confirm the exact subdir with `ls champion/` and adjust if it is not checkpoint-24000.
   name: champion/checkpoint-24000
   freeze_feature_encoder: true      # champion trained with this; keep identical
+  load_processor_from_checkpoint: true   # REQUIRED: reuse champion's 112-token vocab so lm_head is kept, not reinitialized
 data:
   # clean_audio_v3 superset (WAXAL+FLEURS+SALT+Afrivoice+Luganda), cleaned/bucketed.
   # train split = CLEAN bucket only (90,301 rows). validation = in-domain WAXAL (4,235).

@@ -278,22 +278,37 @@ def main() -> None:
 
     output_dir = ensure_dir(config["training_args"]["output_dir"])
     normalization = config.get("text", {}).get("normalization", "language_safe")
-    vocab_path = build_ctc_vocab(list(train_ds["transcription"]), output_dir, normalization)
 
-    tokenizer = Wav2Vec2CTCTokenizer(
-        str(vocab_path),
-        unk_token="[UNK]",
-        pad_token="[PAD]",
-        word_delimiter_token="|",
-    )
-    feature_extractor = Wav2Vec2FeatureExtractor(
-        feature_size=1,
-        sampling_rate=16_000,
-        padding_value=0.0,
-        do_normalize=True,
-        return_attention_mask=True,
-    )
-    processor = Wav2Vec2Processor(feature_extractor=feature_extractor, tokenizer=tokenizer)
+    if bool(config.get("model", {}).get("load_processor_from_checkpoint", False)):
+        # CONTINUATION: reuse the checkpoint's EXACT tokenizer/vocab so the CTC head
+        # (lm_head) matches and is NOT reinitialized. Rebuilding a vocab from the data
+        # yields a different token<->id map and silently discards the trained output layer.
+        from pathlib import Path as _P
+
+        proc_src = model_name
+        if not (_P(model_name) / "vocab.json").exists() and (_P(model_name).parent / "vocab.json").exists():
+            proc_src = str(_P(model_name).parent)  # HF layout: processor at repo root, weights in checkpoint-N/
+        processor = Wav2Vec2Processor.from_pretrained(proc_src)
+        tokenizer = processor.tokenizer
+        feature_extractor = processor.feature_extractor
+        print(f"Loaded processor/vocab from {proc_src}: {len(tokenizer)} tokens (vocab preserved; lm_head kept)")
+    else:
+        vocab_path = build_ctc_vocab(list(train_ds["transcription"]), output_dir, normalization)
+
+        tokenizer = Wav2Vec2CTCTokenizer(
+            str(vocab_path),
+            unk_token="[UNK]",
+            pad_token="[PAD]",
+            word_delimiter_token="|",
+        )
+        feature_extractor = Wav2Vec2FeatureExtractor(
+            feature_size=1,
+            sampling_rate=16_000,
+            padding_value=0.0,
+            do_normalize=True,
+            return_attention_mask=True,
+        )
+        processor = Wav2Vec2Processor(feature_extractor=feature_extractor, tokenizer=tokenizer)
 
     lazy_preprocessing = bool(data_config.get("lazy_preprocessing", True))
     if lazy_preprocessing:
@@ -368,7 +383,7 @@ def main() -> None:
         training_kwargs["remove_unused_columns"] = False
         if training_kwargs.get("group_by_length"):
             print("Disabling group_by_length because lazy preprocessing has no cached input_values column.")
-            training_kwargs["group_by_length"] = False
+            training_kwargs.pop("group_by_length", None)  # pop (not =False): some transformers versions reject the kwarg entirely
     training_args = TrainingArguments(**training_kwargs)
     # Optional early stopping (additive: only active when a config has an `early_stopping`
     # block, so existing configs and in-flight runs are unaffected). Requires

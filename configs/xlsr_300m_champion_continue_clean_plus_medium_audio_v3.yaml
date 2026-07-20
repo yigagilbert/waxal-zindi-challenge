@@ -7,6 +7,7 @@ run_name: xlsr_300m_champion_continue_clean_plus_medium_audio_v3
 model:
   name: champion/checkpoint-24000   # continue from champion, not base XLS-R
   freeze_feature_encoder: true
+  load_processor_from_checkpoint: true   # reuse champion's 112-token vocab (keep lm_head)
 data:
   dataset_dir: data/final_combined_clean_audio_dataset
   extra_train_splits: [medium_train]  # add the 790-row medium bucket at lower effective weight
