@@ -42,7 +42,7 @@ training_args:
   eval_steps: 250
   logging_steps: 50
   load_best_model_at_end: true
-  metric_for_best_model: eval_wer   # if train_whisper computes wer; falls back to eval_loss otherwise
+  metric_for_best_model: eval_loss   # matches the proven whisper_large_v3_lora.yaml; avoids crash if eval_wer isn't computed
   greater_is_better: false
   save_total_limit: 3
   seed: 42
