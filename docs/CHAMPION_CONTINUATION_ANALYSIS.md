@@ -93,7 +93,35 @@ writing to `outputs/submissions/submission_champion_continue_clean_audio_v3_best
 Validate: 4,253 rows · aligned to SampleSubmission · 0 missing/duplicate/empty · no weird chars.
 **Do not submit unless validation combined clearly beats champion.** Keep 0.861 selected regardless.
 
-## Result & recommendation
+## Result & recommendation (2026-07-20) — NEGATIVE, champion retained
 
-_Fill after the run: chosen checkpoint (or "none — champion retained"), the table above, and
-whether a submission was made._
+Clean-only continuation `xlsr_300m_champion_continue_clean_audio_v3` was run and **early-stopped
+at step 2500** (EarlyStopping patience 4, no `eval_cer` improvement).
+
+In-loop eval (cleaned validation, greedy — monitoring metric, not the raw-val gate):
+
+| step | eval_cer | eval_loss |
+|------|----------|-----------|
+| 500  | 0.2450   | 0.3141 |
+| 1000 | 0.2465   | 0.3166 |
+| 1500 | 0.2457   | 0.3158 |
+| 2000 | 0.2463   | 0.3138 |
+| 2500 | 0.2453   | 0.3105 |
+
+- **`eval_cer` is dead flat (~0.245)** and **train loss never descended (2.3–2.8)** — the model
+  did not meaningfully change. (`eval_wer` is unusable here: cleaned-val references tokenize to
+  ~1 "word"/example, inflating it to ~25; use `eval_cer`.)
+- Root cause = as predicted: `clean_audio_v3` train is Afrivoice-heavy, and language-balanced
+  sampling makes the Lingala pool ~54% external read-speech. Continuing at 2e-5 on that
+  distribution neither fit the new data nor improved in-domain WAXAL — matching the earlier
+  clean-audio-v2 negative result.
+
+**Verdict: discard the continuation, retain `champion/checkpoint-24000`. Keep 0.861 selected.**
+No submission generated (no checkpoint beat the champion; a raw-val beam+LM gate on checkpoint-500
+is optional-for-the-record but expected to tie/lose given the flat loss and eval).
+
+**Next:** the acoustic ceiling is not reachable by continuing this XLS-R on more read-speech.
+Move to the Whisper large-v3 LoRA bet ([WHISPER_LARGE_V3_PLAN.md](WHISPER_LARGE_V3_PLAN.md)).
+The clean+medium variant is **not** run (its precondition — clean-only improving — failed).
+A WAXAL-clean-only continuation is low expected value (champion already fits WAXAL; the model
+barely moved here) and is deprioritized in favor of Whisper.
