@@ -9,6 +9,7 @@ data:
   # clean_audio_v3: train split = clean bucket (90,301), validation = in-domain WAXAL (4,235).
   dataset_dir: data/final_combined_clean_audio_dataset
   languages: null
+  lazy_preprocessing: true   # compute mels in the collator; avoids ~87GB of cached features. Needs remove_unused_columns: false (set below).
 lora:
   enabled: true
   r: 16

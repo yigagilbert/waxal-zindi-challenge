@@ -26,10 +26,29 @@ class DataCollatorSpeechSeq2SeqWithPadding:
     def __call__(self, features):
         import torch
 
-        input_features = [{"input_features": feature["input_features"]} for feature in features]
+        # Dual-mode: use precomputed input_features/labels if present (eager .map path),
+        # otherwise compute log-mels + label ids from raw audio/transcription on the fly
+        # (lazy path — avoids caching ~960KB x N mel arrays to disk).
+        if "input_features" in features[0]:
+            input_features = [{"input_features": feature["input_features"]} for feature in features]
+        else:
+            input_features = [
+                {
+                    "input_features": self.processor.feature_extractor(
+                        feature["audio"]["array"], sampling_rate=16_000, do_normalize=True
+                    ).input_features[0]
+                }
+                for feature in features
+            ]
         batch = self.processor.feature_extractor.pad(input_features, return_tensors="pt")
 
-        label_features = [{"input_ids": feature["labels"]} for feature in features]
+        if "labels" in features[0]:
+            label_features = [{"input_ids": feature["labels"]} for feature in features]
+        else:
+            label_features = [
+                {"input_ids": self.processor.tokenizer(str(feature["transcription"])).input_ids}
+                for feature in features
+            ]
         labels_batch = self.processor.tokenizer.pad(label_features, return_tensors="pt")
         labels = labels_batch["input_ids"].masked_fill(labels_batch.attention_mask.ne(1), -100)
         if (labels[:, 0] == self.decoder_start_token_id).all().cpu().item():
@@ -116,9 +135,17 @@ def main() -> None:
             "ID": example["ID"],
         }
 
-    remove_columns = [c for c in train_ds.column_names if c not in {"language", "ID"}]
-    train_data = train_ds.map(prepare_example, remove_columns=remove_columns)
-    eval_data = eval_ds.map(prepare_example, remove_columns=remove_columns)
+    if bool(config.get("data", {}).get("lazy_preprocessing", False)):
+        # No pre-map/cache: the collator computes mels + label ids per batch from raw
+        # audio/transcription. Requires remove_unused_columns: false so audio/transcription
+        # survive to the collator. Avoids ~87GB of cached mel features for 90k clips.
+        train_data = train_ds
+        eval_data = eval_ds
+        print("Using lazy Whisper feature extraction in the collator; no feature cache written.")
+    else:
+        remove_columns = [c for c in train_ds.column_names if c not in {"language", "ID"}]
+        train_data = train_ds.map(prepare_example, remove_columns=remove_columns)
+        eval_data = eval_ds.map(prepare_example, remove_columns=remove_columns)
 
     if config.get("lora", {}).get("enabled", False):
         try:
