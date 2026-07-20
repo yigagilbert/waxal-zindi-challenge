@@ -53,6 +53,21 @@ LID is misrouting — investigate before trusting Phase 2.
 ## Status
 
 - Phase 1 (metadata) pipeline: **proven**, 0.861 public.
-- Phase 2 (no-metadata) pipeline: **built**, needs a re-validation pass with the expanded LMs +
-  new params (and with sna no longer forced greedy) before the Phase 2 test drops (~1 week before
-  close, 2026-08-02).
+- Phase 2 (no-metadata) pipeline: **VALIDATED 2026-07-20** with the expanded LMs + current best
+  params (lin 0.9/0.5, lug 0.4/−0.5, sna 0.7/−0.5, beam 400, sna no longer forced greedy).
+
+### Validation result (champion/checkpoint-24000, generalization_mix validation, 4235)
+Report: `outputs/analysis/no_metadata_validation_report_expanded.json`
+
+- **LID accuracy = 98.56%** (lug perfect: 664/664; lin 1820/1844; sna 1690/1727).
+- **Routed no-metadata combined = 0.1256** (WER 0.1741, CER 0.0771) vs **metadata-aware pooled
+  ≈ 0.1275** — essentially identical (routed is marginally better). Per-language routed:
+  lin 0.1711, lug 0.1146, sna 0.0831 — matches the metadata-aware per-language numbers.
+- **The ~1.4% LID misroutes are almost all stub / near-empty clips** (greedy transcripts like
+  "s", "bat", "tu", "", "m") — the unfixable ~1s stub clips (76 defaulted on empty transcript).
+  On real-content clips LID is near-perfect, so routing costs ~nothing.
+
+**Conclusion: the 0.861 pipeline is Phase-2-safe.** With no metadata, LID + routed decode
+reproduces the metadata-aware score. Use `run_no_metadata_pipeline.py` (params file
+`outputs/analysis/best_decode_params.json`, `--greedy-languages` empty, `--beam-width 400`,
+`--kenlm-dir data/lm_expanded`) to generate the Phase-2 test submission when it drops.
