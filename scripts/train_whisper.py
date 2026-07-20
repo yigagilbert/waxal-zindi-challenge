@@ -89,7 +89,13 @@ def main() -> None:
 
     feature_extractor = WhisperFeatureExtractor.from_pretrained(model_name)
     processor = WhisperProcessor.from_pretrained(model_name, language=None, task="transcribe")
-    model = WhisperForConditionalGeneration.from_pretrained(model_name)
+    # Force fp32 load. Recent transformers loads whisper-large-v3 in its native fp16, which
+    # crashes eval generate() ("Input type (float) and bias type (c10::Half)") because the
+    # fp32 audio hits fp16 conv weights outside autocast. fp32 params + bf16 autocast (from
+    # training_args) keeps training fast and makes generation dtype-consistent.
+    import torch as _torch
+
+    model = WhisperForConditionalGeneration.from_pretrained(model_name, torch_dtype=_torch.float32)
     model.config.forced_decoder_ids = None
     model.config.suppress_tokens = []
     if config["training_args"].get("gradient_checkpointing", False):
