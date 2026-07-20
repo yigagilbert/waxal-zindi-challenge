@@ -1,0 +1,60 @@
+run_name: xlsr_300m_champion_continue_clean_audio_v3
+# CHAMPION CONTINUATION experiment (2026-07-20).
+# Continue fine-tuning the proven champion checkpoint on clean_audio_v3 at a LOW LR.
+# This does NOT start from base XLS-R; it resumes the acoustic learning of the model
+# that produced the 0.861 leaderboard submission. Short + gated (see early_stopping +
+# docs/CHAMPION_CONTINUATION_ANALYSIS.md). Champion artifacts are never overwritten:
+# output_dir is a NEW dir, and model.name points at the pulled champion (read-only).
+model:
+  # Initialize FROM the champion checkpoint, not facebook/wav2vec2-xls-r-300m.
+  # This is the champion pulled from HF (yigagilbert/waxal-xlsr300m-champion) to ./champion.
+  # Confirm the exact subdir with `ls champion/` and adjust if it is not checkpoint-24000.
+  name: champion/checkpoint-24000
+  freeze_feature_encoder: true      # champion trained with this; keep identical
+data:
+  # clean_audio_v3 superset (WAXAL+FLEURS+SALT+Afrivoice+Luganda), cleaned/bucketed.
+  # train split = CLEAN bucket only (90,301 rows). validation = in-domain WAXAL (4,235).
+  dataset_dir: data/final_combined_clean_audio_dataset
+  extra_train_splits: []            # clean bucket ONLY for this first experiment
+  train_manifest: null
+  include_medium: false
+  languages: null
+  min_duration: 0.30
+  max_duration: 50.0
+  language_balanced_sampling: true  # preserve champion's balanced sampling
+  lazy_preprocessing: true
+text:
+  normalization: language_safe      # identical to champion; preserves tokenizer/vocab behavior
+evaluation:
+  normalization: language_safe
+tracking:
+  report_to: none
+  local_dir: outputs/experiments
+# Automatic single-metric guard (in-loop eval_cer). The REAL multi-metric gate is manual,
+# run between checkpoints against the champion on data/processed_generalization_mix
+# validation with beam+LM (see docs/CHAMPION_CONTINUATION_ANALYSIS.md).
+early_stopping:
+  patience: 4        # 4 evals with no eval_cer improvement (= 2000 steps at eval_steps 500) -> stop
+  threshold: 0.001   # require >0.001 absolute eval_cer improvement to reset patience
+training_args:
+  output_dir: checkpoints/xlsr_300m_champion_continue_clean_audio_v3   # NEW dir; never the champion's
+  per_device_train_batch_size: 2
+  per_device_eval_batch_size: 2
+  gradient_accumulation_steps: 8    # effective batch 16, same as champion
+  learning_rate: 2.0e-5             # LOW continuation LR (champion used 3.0e-4). Try 1.0e-5 if it forgets.
+  warmup_ratio: 0.05                # small warmup (~200 steps of 4000)
+  max_steps: 4000                   # short continuation, not a blind full run
+  bf16: true                        # H100 (sm_90): bf16 is more stable than fp16 for continuation
+  fp16: false
+  gradient_checkpointing: true
+  eval_strategy: steps
+  save_strategy: steps
+  save_steps: 500
+  eval_steps: 500
+  logging_steps: 50
+  save_total_limit: 10              # keep all continuation checkpoints for per-step comparison
+  seed: 42
+  group_by_length: true             # auto-disabled under lazy_preprocessing (see trainer)
+  load_best_model_at_end: true
+  metric_for_best_model: eval_cer
+  greater_is_better: false

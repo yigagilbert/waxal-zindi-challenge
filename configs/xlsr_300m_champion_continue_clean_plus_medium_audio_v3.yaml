@@ -1,0 +1,51 @@
+run_name: xlsr_300m_champion_continue_clean_plus_medium_audio_v3
+# SECOND champion-continuation experiment: clean + medium buckets.
+# DO NOT RUN unless the clean-only continuation
+# (xlsr_300m_champion_continue_clean_audio_v3) first shows a clear validation gain
+# over the champion on data/processed_generalization_mix. Adding the medium bucket
+# without that evidence risks importing lower-quality labels.
+model:
+  name: champion/checkpoint-24000   # continue from champion, not base XLS-R
+  freeze_feature_encoder: true
+data:
+  dataset_dir: data/final_combined_clean_audio_dataset
+  extra_train_splits: [medium_train]  # add the 790-row medium bucket at lower effective weight
+  train_manifest: null
+  include_medium: false
+  languages: null
+  min_duration: 0.30
+  max_duration: 50.0
+  language_balanced_sampling: true
+  lazy_preprocessing: true
+text:
+  normalization: language_safe
+evaluation:
+  normalization: language_safe
+tracking:
+  report_to: none
+  local_dir: outputs/experiments
+early_stopping:
+  patience: 4
+  threshold: 0.001
+training_args:
+  output_dir: checkpoints/xlsr_300m_champion_continue_clean_plus_medium_audio_v3
+  per_device_train_batch_size: 2
+  per_device_eval_batch_size: 2
+  gradient_accumulation_steps: 8
+  learning_rate: 2.0e-5
+  warmup_ratio: 0.05
+  max_steps: 4000
+  bf16: true
+  fp16: false
+  gradient_checkpointing: true
+  eval_strategy: steps
+  save_strategy: steps
+  save_steps: 500
+  eval_steps: 500
+  logging_steps: 50
+  save_total_limit: 10
+  seed: 42
+  group_by_length: true
+  load_best_model_at_end: true
+  metric_for_best_model: eval_cer
+  greater_is_better: false

@@ -1,0 +1,49 @@
+run_name: whisper_large_v3_clean_audio_v3_lora
+# FALLBACK experiment: Whisper large-v3 LoRA on clean_audio_v3.
+# Do NOT launch before the champion-continuation result is known, unless a second GPU
+# is free. LoRA first (not full fine-tune) to fail cheap. Kill early if it does not
+# approach the champion validation trajectory (see docs/WHISPER_LARGE_V3_PLAN.md).
+model:
+  name: openai/whisper-large-v3
+data:
+  # clean_audio_v3: train split = clean bucket (90,301), validation = in-domain WAXAL (4,235).
+  dataset_dir: data/final_combined_clean_audio_dataset
+  languages: null
+lora:
+  enabled: true
+  r: 16
+  lora_alpha: 32
+  target_modules:
+    - q_proj
+    - v_proj
+  lora_dropout: 0.05
+  bias: none
+evaluation:
+  normalization: starter_lower   # Whisper eval convention in train_whisper.py
+tracking:
+  report_to: none
+  local_dir: outputs/experiments
+training_args:
+  output_dir: checkpoints/whisper_large_v3_clean_audio_v3_lora
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 16
+  learning_rate: 1.0e-4
+  warmup_steps: 100
+  max_steps: 2000                # cheap first pass; extend only if the trajectory is promising
+  gradient_checkpointing: true
+  bf16: true                     # H100; whisper large-v3 is more stable in bf16
+  fp16: false
+  eval_strategy: steps
+  save_strategy: steps
+  predict_with_generate: true
+  generation_max_length: 256
+  save_steps: 250
+  eval_steps: 250
+  logging_steps: 50
+  load_best_model_at_end: true
+  metric_for_best_model: eval_wer   # if train_whisper computes wer; falls back to eval_loss otherwise
+  greater_is_better: false
+  save_total_limit: 3
+  seed: 42
+  remove_unused_columns: false

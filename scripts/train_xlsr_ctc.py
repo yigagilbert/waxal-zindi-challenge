@@ -370,6 +370,23 @@ def main() -> None:
             print("Disabling group_by_length because lazy preprocessing has no cached input_values column.")
             training_kwargs["group_by_length"] = False
     training_args = TrainingArguments(**training_kwargs)
+    # Optional early stopping (additive: only active when a config has an `early_stopping`
+    # block, so existing configs and in-flight runs are unaffected). Requires
+    # load_best_model_at_end + metric_for_best_model, which the continuation configs set.
+    callbacks = []
+    es_cfg = config.get("early_stopping")
+    if es_cfg:
+        from transformers import EarlyStoppingCallback
+
+        patience = int(es_cfg.get("patience", 4))
+        threshold = float(es_cfg.get("threshold", 0.0))
+        callbacks.append(
+            EarlyStoppingCallback(early_stopping_patience=patience, early_stopping_threshold=threshold)
+        )
+        print(
+            f"EarlyStopping enabled: patience={patience} threshold={threshold} "
+            f"(watching {training_kwargs.get('metric_for_best_model')})"
+        )
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -378,6 +395,7 @@ def main() -> None:
         data_collator=data_collator,
         compute_metrics=compute_metrics,
         processing_class=processor,
+        callbacks=callbacks or None,
     )
     trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
     metrics = trainer.evaluate()
