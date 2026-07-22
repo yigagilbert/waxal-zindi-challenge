@@ -88,7 +88,25 @@ python scripts/sweep_kenlm_decode_params.py \
 # scripts/analyze_prediction_distributions.py on the checkpoint's predictions
 ```
 
-## Result & recommendation
+## Result & recommendation (2026-07-20) — NEGATIVE, champion retained
 
-_Fill after the run: best checkpoint (or "none — champion retained"), the table above, its tuned
-decode params, raw-val comparison to champion, and whether it becomes the new champion._
+Run early-stopped at **step 9500** (EarlyStopping patience 6; best in-loop eval_cer 0.2476 at
+step 6500). In-loop cleaned-val CER (~0.25) looked like a tie, but that metric is muddled (munged
+cleaned-val refs, broken eval_wer) — the **raw-val gate is the truth**:
+
+Raw `generalization_mix` validation, checkpoint-6500, coarse sweep (600 samples, beam 100):
+
+| lang | retrain greedy | retrain best beam+LM | champion best beam+LM |
+|------|----------------|----------------------|-----------------------|
+| lin  | **0.403**      | **0.304** (α0.5/β0.5) | **0.171** |
+
+`lin` (worst language + 44% of test) regressed hard — greedy 0.403 vs champion 0.265, best beam+LM
+0.304 vs 0.171. The **greedy** gap shows the acoustic model itself is worse, not a decode-tuning
+issue, so lug/sna (not completed — disk) are unnecessary: lin alone sinks the pooled score well
+above 0.135. Cause = clean_audio_v3's lin pool is ~54% Afrivoice read-speech, biasing the model off
+WAXAL's spontaneous domain (clean-audio-v2 reproduced).
+
+**Verdict: keep the champion. Same recipe on cleaner data produced a WORSE model, not a stronger
+one.** No submission. This is the 4th failed acoustic bet (after XLS-R 1B, the clean_audio_v3
+continuation, and Whisper large-v3 LoRA). The acoustic ceiling for this data+architecture is the
+champion; stop chasing it. Lock 0.861 + the no-metadata Phase-2 pipeline as the finish.
