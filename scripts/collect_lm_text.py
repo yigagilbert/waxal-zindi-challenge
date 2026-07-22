@@ -15,6 +15,7 @@ data/lm_expanded) so the working data/lm LMs stay intact for A/B and rollback.
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import subprocess
 import sys
@@ -62,6 +63,10 @@ HF_SOURCES = [
      "language": "sna", "license": "CC-BY-4.0", "gated": True},
     {"dataset": "DigitalUmuganda/Afrivoice", "loader": "afrivoice_manifest", "manifest_folder": "Lingala",
      "language": "lin", "license": "CC-BY-4.0", "gated": True},
+    # Wikipedia Lingala (small, ~4k articles): license-safe general text for lexical coverage
+    # on the bottleneck language. Articles are sentence-split before normalization.
+    {"dataset": "wikimedia/wikipedia", "config": "20231101.ln", "splits": ["train"],
+     "language": "lin", "license": "CC-BY-SA-4.0 (Wikipedia)", "split_sentences": True},
 ]
 
 DEFAULT_SPLITS = ["train", "validation", "test"]
@@ -210,10 +215,16 @@ def harvest_hf_source(src: dict, languages: set[str], args: argparse.Namespace):
                 if not matches_language_filter(row, src.get("language_filter")):
                     continue
                 text = pick_text(row)
-                norm = normalize_text(text, args.normalization)
-                if len(norm) >= args.min_chars:
-                    lines.append(norm)
-                    n += 1
+                # Document-style sources (e.g. Wikipedia articles) are split into
+                # sentence-ish lines so KenLM sees per-sentence BOS/EOS statistics.
+                pieces = re.split(r"(?<=[.!?;])\s+|\n+", text) if src.get("split_sentences") else [text]
+                for piece in pieces:
+                    norm = normalize_text(piece, args.normalization)
+                    if len(norm) >= args.min_chars:
+                        lines.append(norm)
+                        n += 1
+                    if args.max_lines_per_source and n >= args.max_lines_per_source:
+                        break
                 if args.max_lines_per_source and n >= args.max_lines_per_source:
                     break
         except Exception as exc:
