@@ -38,9 +38,9 @@ training_args:
   per_device_train_batch_size: 2
   per_device_eval_batch_size: 2
   gradient_accumulation_steps: 8    # effective batch 16
-  learning_rate: 5.0e-5             # between the failed 2e-5 continuation and full 3e-4; room to move without erasing the champion optimum
+  learning_rate: 2.0e-5             # v2: 5e-5 DESTROYED the converged optimum (lin CER 0.159->0.35 by step 500, slope too shallow to recover — run killed 2026-07-22). 2e-5 was non-destructive in the clean_v3 continuation; the open question is whether it can LEARN on in-domain lin-only data (the flat result there may have been the OOD mix, not the LR).
   warmup_ratio: 0.05
-  max_steps: 4000                   # ~3.5 epochs over ~18.4k lin rows
+  max_steps: 6000                   # ~5 epochs over ~18.4k lin rows; kill manually if eval_cer is still ~0.159-flat by step 2500-3000 (branch closed, move to Step 4)
   bf16: true
   fp16: false
   gradient_checkpointing: true
