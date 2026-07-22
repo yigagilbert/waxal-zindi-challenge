@@ -70,6 +70,7 @@ Unclear and treated as unsafe for direct training:
 | BibleTTS | Research-only | External dataset not explicitly specified for this challenge | Model/data research only |
 | Makerere Radio Luganda | Research-only | External dataset and license/code-review suitability not confirmed | Research only |
 | Any Hugging Face ASR dataset for lug/lin/sna | Research-only | External unless Zindi confirms | Research only |
+| Wikipedia Lingala (`wikimedia/wikipedia`, `20231101.ln`) | Used under Data-tab permissive reading, disclosed | CC-BY-SA-4.0 public text; TEXT-ONLY for the Lingala KenLM decode corpus (no audio, no labels) | Lingala LM corpus v2 (`data/lm_expanded_v2*`), added 2026-07-22 |
 
 ## Model Decisions
 

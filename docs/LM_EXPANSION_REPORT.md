@@ -61,8 +61,13 @@ Baseline: champion + `data/lm_expanded` 5-gram, lin best (α0.9, β0.5, beam400)
 
 | LM | best (α,β) | WER | CER | combined | Δ vs 0.1711 |
 |---|---|---|---|---|---|
-| expanded_v2 5-gram | | | | | |
-| expanded_v2 6-gram | | | | | |
+| expanded_v2 5-gram | _pending / optional_ | | | | |
+| **expanded_v2 6-gram** | **(0.8, 0.75)** | **0.2092** | **0.1273** | **0.1683** | **−0.0028 (GATE PASSED)** |
+
+2026-07-22: 6-gram result is on the beta-grid edge (β=0.75 max tested); a micro-sweep at
+β 0.75–1.25 / α 0.75–0.85 is running before the test redecode. CER improved alongside WER —
+no lexicon-substitution regression. Corpus: 109,001 lines (o5 dir) / 127,437 (o6 dir, extra
+WAXAL anchor); Wikipedia-Lingala contributed 36,510 sentence-split lines.
 
 Degenerate-output check on the winning decode (`analyze_prediction_distributions.py` or the
 router script's flags): dot-only ___ / very-short ___ / repeated-ngram ___ (champion baseline:
