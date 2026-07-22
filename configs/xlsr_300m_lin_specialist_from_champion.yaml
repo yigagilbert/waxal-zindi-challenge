@@ -1,0 +1,56 @@
+run_name: xlsr_300m_lin_specialist_from_champion
+# LINGALA SPECIALIST — the headline targeted experiment (see docs/FINAL_TOP3_STRATEGY.md).
+# The entire top-3 gap is Lingala (docs/TOP3_GAP_ANALYSIS.md): lin val combined 0.1711 vs
+# sna 0.0857; lin at sna's level = top-3 territory. This continues the CHAMPION on the
+# lin-only slice of ITS OWN training mix (WAXAL-lin 14400 + FLEURS-lin ~4000, raw audio) —
+# in-domain focus with zero Afrivoice read-speech (the confirmed trap).
+# Deployment is ROUTING-ONLY: used for clips LID predicts as lin (98.5% accurate), so
+# forgetting lug/sna is acceptable and the pipeline stays Phase-2-safe.
+model:
+  name: champion/checkpoint-24000
+  freeze_feature_encoder: true
+  load_processor_from_checkpoint: true   # keep the champion's 112-token vocab + trained lm_head
+data:
+  dataset_dir: data/processed_generalization_mix   # the champion's own (raw-audio) mix
+  languages: [lin]                                  # lin-only train AND eval slices
+  extra_train_splits: []
+  train_manifest: null
+  include_medium: false
+  min_duration: 0.30
+  max_duration: 50.0
+  language_balanced_sampling: false                 # single language; balancing is a no-op
+  lazy_preprocessing: true
+text:
+  normalization: language_safe
+evaluation:
+  normalization: language_safe
+tracking:
+  report_to: none
+  local_dir: outputs/experiments
+# Relaxed guard: specialist runs are short; let the LR decay complete. eval_cer here is the
+# lin-only slice of the RAW validation (in-domain), so it IS meaningful, unlike the cleaned-val
+# runs. Manual gate: raw-val lin beam+LM sweep on the best checkpoint vs champion's 0.1711.
+early_stopping:
+  patience: 8
+  threshold: 0.0005
+training_args:
+  output_dir: checkpoints/xlsr_300m_lin_specialist_from_champion
+  per_device_train_batch_size: 2
+  per_device_eval_batch_size: 2
+  gradient_accumulation_steps: 8    # effective batch 16
+  learning_rate: 5.0e-5             # between the failed 2e-5 continuation and full 3e-4; room to move without erasing the champion optimum
+  warmup_ratio: 0.05
+  max_steps: 4000                   # ~3.5 epochs over ~18.4k lin rows
+  bf16: true
+  fp16: false
+  gradient_checkpointing: true
+  eval_strategy: steps
+  save_strategy: steps
+  save_steps: 500
+  eval_steps: 500
+  logging_steps: 50
+  save_total_limit: 8
+  seed: 42
+  load_best_model_at_end: true
+  metric_for_best_model: eval_cer
+  greater_is_better: false

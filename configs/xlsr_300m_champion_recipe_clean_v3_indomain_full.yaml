@@ -1,0 +1,53 @@
+run_name: xlsr_300m_champion_recipe_clean_v3_indomain_full
+# THE ONE sanctioned full-schedule experiment (docs/FINAL_TOP3_STRATEGY.md §5).
+# Tests the previously-unfair hypothesis cleanly: champion recipe + champion MIX, but with
+# CLEANED audio (clean_audio_v3 filtered to in-domain sources; the 3,906 defective rows are
+# already excluded by the cleaning). Removes BOTH confounds of the failed retrain:
+#   - no Afrivoice/Luganda-CV read-speech domination (source filter)
+#   - no early stopping / truncation: epoch-parity with the champion (~52-55k rows x 24k steps
+#     ≈ 6.7-7 epochs, matching the champion's ~6.9)
+# KILL CONDITIONS: NaN/inf loss or sustained divergence ONLY — not early underperformance.
+# Decision only at 24k via raw-val beam+LM sweep (promote iff pooled < 0.1276-0.003, lin <= 0.171).
+model:
+  name: facebook/wav2vec2-xls-r-300m
+  freeze_feature_encoder: true
+data:
+  dataset_dir: data/final_combined_clean_audio_dataset
+  source_datasets: [waxal_official_clean, google/fleurs, Sunbird/salt]  # champion mix only
+  extra_train_splits: []
+  train_manifest: null
+  include_medium: false
+  languages: null
+  min_duration: 0.30
+  max_duration: 50.0
+  language_balanced_sampling: true
+  lazy_preprocessing: true
+text:
+  normalization: language_safe
+evaluation:
+  normalization: language_safe
+tracking:
+  report_to: none
+  local_dir: outputs/experiments
+# NO early_stopping block — deliberate. This run must complete its schedule.
+training_args:
+  output_dir: checkpoints/xlsr_300m_champion_recipe_clean_v3_indomain_full
+  per_device_train_batch_size: 2
+  per_device_eval_batch_size: 2
+  gradient_accumulation_steps: 8
+  learning_rate: 3.0e-4
+  warmup_steps: 2400
+  max_steps: 24000
+  bf16: true
+  fp16: false
+  gradient_checkpointing: true
+  eval_strategy: steps
+  save_strategy: steps
+  save_steps: 500
+  eval_steps: 500
+  logging_steps: 50
+  save_total_limit: 5
+  seed: 42
+  load_best_model_at_end: true
+  metric_for_best_model: eval_cer
+  greater_is_better: false

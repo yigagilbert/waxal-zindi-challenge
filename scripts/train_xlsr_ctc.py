@@ -248,6 +248,18 @@ def main() -> None:
         train_ds = train_ds.filter(lambda language: language in language_set, input_columns=["language"])
         eval_ds = eval_ds.filter(lambda language: language in language_set, input_columns=["language"])
 
+    # Optional TRAIN-side source filter (e.g. keep only the champion's in-domain mix inside
+    # clean_audio_v3: waxal_official_clean + google/fleurs + Sunbird/salt). Eval is left
+    # untouched — validation is already in-domain WAXAL.
+    source_datasets = data_config.get("source_datasets")
+    if source_datasets:
+        if "source_dataset" not in train_ds.column_names:
+            raise ValueError("data.source_datasets set but train split has no source_dataset column")
+        source_set = set(source_datasets)
+        before = len(train_ds)
+        train_ds = train_ds.filter(lambda src: src in source_set, input_columns=["source_dataset"])
+        print(f"Source filter {sorted(source_set)}: train {before} -> {len(train_ds)} rows")
+
     train_manifest = args.train_manifest or data_config.get("train_manifest")
     include_medium = args.include_medium
     if include_medium is None:
