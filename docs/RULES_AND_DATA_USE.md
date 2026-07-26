@@ -83,6 +83,7 @@ Unclear and treated as unsafe for direct training:
 | `facebook/mms-1b-all` | Non-commercial license risk | Diagnostic only; do not use for final training unless approved |
 | `Sunbird/asr-mms-salt` | Non-commercial license risk | Diagnostic only |
 | `facebook/seamless-m4t-v2-large` | Non-commercial license risk | Diagnostic only, later if needed |
+| `huwenjie333/whisper-v3-ft-af51` | Openly available pretrained model (public HF repo) — verify license tag on the model card before any final-submission use | Under evaluation 2026-07-26 as Lingala teacher/fallback: scored on WAXAL lin validation; possible uses = direct lin routing or pseudo-label teacher for unlabeled WAXAL lin |
 
 ## Phase 1 Decision
 

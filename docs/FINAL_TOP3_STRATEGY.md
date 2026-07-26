@@ -93,6 +93,16 @@ Config: `configs/xlsr_300m_champion_recipe_clean_v3_indomain_full.yaml`
 reachable only if #3 or #5 overdelivers.** All items are Phase-2-compatible (specialist and router
 key off *predicted* language / decoder-side features only).
 
+## 6b. Outcome log (updated as experiments complete)
+
+| date | experiment | result | evidence |
+|---|---|---|---|
+| 2026-07-22 | LM expansion (#1) | **POSITIVE — banked.** lin 0.1711→0.1683 (val, o6+Wikipedia, α0.8/β0.75); public 0.8610→**0.86216** (`champ_lmv2_o6.csv`) | `outputs/analysis/lm_v2_lin_sweep_o6*.json` |
+| 2026-07-22 | Oracle/router (#2) | **CLOSED.** oracle_upside 0.0033 < 0.005 gate (only real per-sample gap is lug, 15% share) | `outputs/analysis/model_zoo_oracle_validation.json` |
+| 2026-07-22 | Lin specialist (#3) | **CLOSED.** Continuation on the champion's own lin slice ≈ parity (ckpt-1000 external: greedy 0.2705 / beam 0.1755 vs 0.2647 / 0.1683) — no new information in already-seen data. Side discovery: **in-loop eval on this box strips reference spaces** (276,500−227,817 = 48,683 = exact space count) → in-loop CER inflated ~2×, trend-only | `outputs/analysis/lin_specialist_v2_ckpt1000_check.json` |
+| 2026-07-23 | Full-schedule clean in-domain run (#5) | **NEGATIVE — champion retained.** 24k steps / 7.7 epochs, no early stop, champion mix source-filtered (48,978 rows). External gate ckpt-24000: lin best 0.1881 vs champion 0.1683 (+0.020 worse); greedy 0.284 vs 0.265. Only remaining variable was the cleaned/**trimmed** audio → trimming creates a train/inference mismatch vs raw test audio. **Lesson: do not trim audio for this task.** Sixth-and-final acoustic negative; ceiling proven | `outputs/analysis/fullrun_ckpt24000_lin.json` |
+| 2026-07-26 | Teacher evaluation: `huwenjie333/whisper-v3-ft-af51` (new branch) | **IN PROGRESS.** Openly-available Whisper-v3 African-languages fine-tune (reports lin WER 0.238 on read-speech benchmark — NOT WAXAL). Decisive test: score it on WAXAL lin validation. Thresholds: <0.168 → route lin to it directly (no training); 0.168–0.22 → use as pseudo-label teacher for unlabeled WAXAL lin; >0.26/hallucinating → discard | `outputs/analysis/whisper_af51_lin_eval.json` (pending) |
+
 ## 7. Answers to the five closing questions
 
 1. **Truly at the acoustic ceiling?** For *multilingual training on the mixes tried* — yes
