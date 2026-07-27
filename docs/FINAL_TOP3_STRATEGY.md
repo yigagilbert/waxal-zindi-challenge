@@ -108,6 +108,8 @@ key off *predicted* language / decoder-side features only).
 
 | 2026-07-27 | Phase-2 collapse triage | Baseline scored **0.2829** (WER 0.93/CER 0.50) vs Phase-2 leaders ~0.65 (everyone collapsed from 0.9x — massive domain shift; 19–29 s clips, 16 kHz clean). Ruled out: CSV alignment, sample rate, stubs, **and LID** — new acoustic LID probe (`train_audio_lid.py`, val acc 99.4%) independently confirms the transcript-LID mix (lin 267/lug 961/sna 272 vs 245/945/310). Alvin closed on lug too (0.2409 vs champion 0.1259 greedy). Remaining suspects: KenLM-beam hallucination on half-heard audio vs raw acoustic collapse — decided by the greedy A/B submission. | `outputs/audio_lid/audio_lid_report.json` |
 
+| 2026-07-27 | **Phase-2 mystery SOLVED: unseen-language generalization test** | af51 probe transcripts identify the 1,500 clips as **Acholi/Lango, Runyankole-Rukiga, Lusoga, Lumasaba** etc — not lin/lug/sna. Both in-house LIDs coerced clips into the trio; the champion transliterated correctly-heard content into Luganda phonology (ID_TBDTM comparison is the smoking gun) → 0.2829. Leaders (~0.65) run multilingual African models. **Pivot: af51 (previously discarded for Phase-1 domains) becomes the primary Phase-2 engine.** Submission `phase2_af51.csv`; refinement ladder = beams, normalization A/B, language forcing. | `outputs/analysis/phase2_whisper_lid_probe.csv` |
+
 ## 7. Answers to the five closing questions
 
 1. **Truly at the acoustic ceiling?** For *multilingual training on the mixes tried* — yes
