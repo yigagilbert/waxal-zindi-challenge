@@ -83,7 +83,7 @@ Unclear and treated as unsafe for direct training:
 | `facebook/mms-1b-all` | Non-commercial license risk | Diagnostic only; do not use for final training unless approved |
 | `Sunbird/asr-mms-salt` | Non-commercial license risk | Diagnostic only |
 | `facebook/seamless-m4t-v2-large` | Non-commercial license risk | Diagnostic only, later if needed |
-| `huwenjie333/whisper-v3-ft-af51` | Openly available pretrained model (public HF repo) | **Evaluated 2026-07-27, NOT USED in any submission**: WAXAL-lin validation combined 0.3397 vs champion 0.1683 (read-speech benchmark did not transfer to spontaneous audio). Evaluation-only; no training or predictions derived from it. |
+| `huwenjie333/whisper-v3-ft-af51` | Openly available pretrained model (public HF repo) — "You may use pretrained models as long as they are openly available to everyone" | **USED for Phase-2 submissions from 2026-07-27** (`phase2_af51*.csv`): Phase 2 is an unseen-language generalization test (Acholi/Lango, Runyankole-Rukiga, Lusoga, Lumasaba, …) outside lin/lug/sna; af51's 51-African-language coverage makes it the appropriate engine there. (Phase-1 evaluation: WAXAL-lin 0.3397 vs champion 0.1683 — not used for Phase 1.) Inference-only; no fine-tuning performed on it. |
 
 ## Phase 1 Decision
 
