@@ -185,7 +185,10 @@ def build_pyctcdecode_decoder(processor, args: argparse.Namespace):
 def decode_logits(processor, logits, pred_ids, decoder, args: argparse.Namespace) -> list[str]:
     tokenizer = processor.tokenizer
     if decoder is None:
-        decoded = processor.batch_decode(pred_ids)
+        # tokenizer-level decode: Wav2Vec2Processor.batch_decode delegates here anyway, but
+        # Wav2Vec2ProcessorWithLM (repos bundling their own pyctcdecode LM, e.g. the Alvin
+        # w2v-bert checkpoints) overrides batch_decode to expect LOGITS — bypass it.
+        decoded = tokenizer.batch_decode(pred_ids)
     else:
         logits_np = logits.detach().float().cpu().numpy()
         decoded = [decoder.decode(item, beam_width=args.beam_width) for item in logits_np]
