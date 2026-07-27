@@ -106,6 +106,8 @@ key off *predicted* language / decoder-side features only).
 
 | 2026-07-27 | **Phase 2 baseline** (`phase2_champion_nometa.csv`) | Pipeline ran clean on the new 1,500-clip no-metadata test: **0 empty transcripts, 0 dot-only, postprocess changed 0 rows** (no stub-clip defect in Phase 2). **LID mix FLIPPED vs Phase 1: lug 945 (63%) / sna 310 (21%) / lin 245 (16%)** — Luganda-dominant, Lingala (our weakest) shrank 44%→16%. Weighted val-equivalent ≈ 0.118 → projected public ~0.87–0.885. **Strategy flip: Luganda optimization is now worth ~4× Lingala** — next levers: Alvin (name says 313-hr Luganda ft) on lug validation; Wikipedia-lug LM expansion + lug re-sweep. | `outputs/analysis/phase2_nometa_report.json` |
 
+| 2026-07-27 | Phase-2 collapse triage | Baseline scored **0.2829** (WER 0.93/CER 0.50) vs Phase-2 leaders ~0.65 (everyone collapsed from 0.9x — massive domain shift; 19–29 s clips, 16 kHz clean). Ruled out: CSV alignment, sample rate, stubs, **and LID** — new acoustic LID probe (`train_audio_lid.py`, val acc 99.4%) independently confirms the transcript-LID mix (lin 267/lug 961/sna 272 vs 245/945/310). Alvin closed on lug too (0.2409 vs champion 0.1259 greedy). Remaining suspects: KenLM-beam hallucination on half-heard audio vs raw acoustic collapse — decided by the greedy A/B submission. | `outputs/audio_lid/audio_lid_report.json` |
+
 ## 7. Answers to the five closing questions
 
 1. **Truly at the acoustic ceiling?** For *multilingual training on the mixes tried* — yes
