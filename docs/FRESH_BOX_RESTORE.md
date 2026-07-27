@@ -1,5 +1,34 @@
 # Fresh-Box Restore Runbook
 
+## ⚡ Phase-2 quickstart (use this from 2026-07-28 on; full Phase-1 restore below is only for champion work)
+
+State as of 2026-07-27 night: **rank 2 @ 0.6817** (`phase2_af51_beam5.csv`, SELECTED); greedy was
+0.6773; #1 Sophey 0.7087 (gap 0.0270). Engine: `huwenjie333/whisper-v3-ft-af51` (Phase 2 =
+unseen Ugandan languages: Acholi/Lango, Runyankole-Rukiga, Lusoga, Lumasaba).
+
+Fresh box to decoding in ~20 min:
+```bash
+git clone https://github.com/yigagilbert/waxal-zindi-challenge && cd waxal-zindi-challenge
+uv pip install --system "datasets>=3.0,<4" soundfile librosa "transformers>=4.46" torch \
+  pyctcdecode kenlm huggingface_hub peft accelerate && huggingface-cli login
+mkdir -p data/phase2 && cd data/phase2 \
+  && curl -LO https://storage.googleapis.com/waxalphase2/audio.zip && unzip -q audio.zip && cd ../..
+# Test_phase2.csv: scp from Mac, or pull from the artifacts repo:
+python -c "from huggingface_hub import hf_hub_download; import shutil; shutil.copy(hf_hub_download('yigagilbert/waxal-private-artifacts','phase2/Test_phase2.csv',repo_type='dataset'),'data/phase2/Test_phase2.csv')"
+python scripts/prepare_phase2_test.py --audio-dir data/phase2/audio --test-csv data/phase2/Test_phase2.csv
+# af51 downloads itself on first inference. All 07-27 outputs live in
+# yigagilbert/waxal-private-artifacts under phase2/ (predictions, submissions, analysis, audio_lid).
+```
+
+Refinement ladder (one variable per submission, 5/day, close 2026-08-03):
+1. **Raw-text A/B** — `phase2_af51_beam5_rawtext.csv` (already built + on the Mac; NO GPU needed).
+2. **Sunbird engine A/B** — user to name the strongest openly-available Sunbird model for
+   Acholi/Runyankole/Lusoga/Lumasaba; run full-set, compare to 0.6817.
+3. **Per-language routing** between af51 and the Sunbird engine (cluster by af51 transcript
+   language cues or a 4-class audio probe) — the credible path past 0.7087.
+4. Beam 8–10 / temperature-fallback decode; length-penalty tuning.
+
+
 Bootstraps a brand-new GPU box (e.g. Vast RTX 4090) to full campaign state in ~3–4 h.
 Written 2026-07-27 after the Azure box was deleted. Everything below is recoverable from
 git + HF + the gated source datasets; nothing irreplaceable was ever box-local.
