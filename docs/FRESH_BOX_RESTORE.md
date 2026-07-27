@@ -15,7 +15,7 @@ git + HF + the gated source datasets; nothing irreplaceable was ever box-local.
 git clone https://github.com/yigagilbert/waxal-zindi-challenge && cd waxal-zindi-challenge
 pip install uv 2>/dev/null || true
 uv pip install --system "datasets>=3.0,<4" soundfile librosa "transformers>=4.46" torch \
-  pyctcdecode kenlm huggingface_hub
+  pyctcdecode kenlm huggingface_hub peft accelerate
 huggingface-cli login        # token with access to gated google/WaxalNLP + private repos
 nvidia-smi                   # confirm VRAM (24 vs 48 GB -> whisper batch 8 vs 16)
 export WAXAL_RAW_DIR=$PWD/google-waxal-asr-challenge20260630-10570-elxebu
