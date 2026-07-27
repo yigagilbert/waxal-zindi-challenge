@@ -18,6 +18,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--vocab-path", type=Path, default=None)
+    parser.add_argument(
+        "--hf-processor",
+        action="store_true",
+        help="Load AutoProcessor from the checkpoint (HF repo id or local dir) instead of building "
+        "a Wav2Vec2Processor from vocab.json. Required for non-Wav2Vec2 CTC models "
+        "(e.g. w2v-BERT 2.0, which consumes input_features rather than raw input_values).",
+    )
     parser.add_argument("--dataset-dir", type=Path, default=Path("data/processed"))
     parser.add_argument("--split", choices=["train", "validation", "test"], default="validation")
     parser.add_argument("--languages", nargs="*", default=None, choices=list(TARGET_LANGUAGES))
@@ -205,11 +212,17 @@ def main() -> None:
     except ImportError as exc:
         raise RuntimeError("torch and transformers are required. Install dependencies with `uv sync`.") from exc
 
-    if not args.checkpoint.exists():
-        raise FileNotFoundError(f"Checkpoint does not exist: {args.checkpoint}")
+    if args.hf_processor:
+        # HF repo id or local dir; the checkpoint's own processor knows its input format
+        # (input_features for w2v-BERT, input_values for Wav2Vec2/XLS-R).
+        from transformers import AutoProcessor
 
-    vocab_path = resolve_vocab_path(args.checkpoint, args.vocab_path)
-    processor = build_processor(vocab_path)
+        processor = AutoProcessor.from_pretrained(str(args.checkpoint))
+    else:
+        if not args.checkpoint.exists():
+            raise FileNotFoundError(f"Checkpoint does not exist: {args.checkpoint}")
+        vocab_path = resolve_vocab_path(args.checkpoint, args.vocab_path)
+        processor = build_processor(vocab_path)
 
     ds = load_split(args.dataset_dir, args.split)
     if args.languages:
@@ -221,7 +234,7 @@ def main() -> None:
         raise ValueError("No examples selected for inference.")
 
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
-    model = AutoModelForCTC.from_pretrained(args.checkpoint).to(device)
+    model = AutoModelForCTC.from_pretrained(str(args.checkpoint)).to(device)
     model.eval()
     decoder = build_pyctcdecode_decoder(processor, args)
 

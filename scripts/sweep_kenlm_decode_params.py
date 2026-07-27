@@ -33,6 +33,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--vocab-path", type=Path, default=None)
+    parser.add_argument(
+        "--hf-processor",
+        action="store_true",
+        help="Load AutoProcessor from the checkpoint (HF repo id or local dir) instead of building "
+        "a Wav2Vec2Processor from vocab.json. Required for non-Wav2Vec2 CTC models (e.g. w2v-BERT 2.0).",
+    )
     parser.add_argument("--dataset-dir", type=Path, required=True)
     parser.add_argument("--split", default="validation")
     parser.add_argument("--languages", nargs="*", default=["lin", "lug", "sna"])
@@ -68,10 +74,19 @@ def compute_language_logits(model, processor, ds, *, batch_size: int, device):
         inputs = {key: value.to(device) for key, value in inputs.items()}
         with torch.no_grad():
             logits = model(**inputs).logits
-        input_lengths = inputs["attention_mask"].sum(-1)
-        output_lengths = model._get_feat_extract_output_lengths(input_lengths)
+        # Trim padded frames per example. Wav2Vec2/XLS-R maps raw-sample lengths to frame
+        # counts via _get_feat_extract_output_lengths; other CTC archs (w2v-BERT takes
+        # input_features directly) may not — fall back to the full (padded) logit length,
+        # which only adds trailing blank-dominated frames within a batch.
+        output_lengths = None
+        if "attention_mask" in inputs and hasattr(model, "_get_feat_extract_output_lengths"):
+            try:
+                output_lengths = model._get_feat_extract_output_lengths(inputs["attention_mask"].sum(-1))
+            except Exception:
+                output_lengths = None
         for row_idx in range(logits.shape[0]):
-            length = int(output_lengths[row_idx])
+            length = int(output_lengths[row_idx]) if output_lengths is not None else logits.shape[1]
+            length = min(max(length, 1), logits.shape[1])
             logits_list.append(logits[row_idx, :length].detach().to(torch.float16).cpu().numpy())
         refs.extend(batch["transcription"])
         ids.extend(batch["ID"])
@@ -92,12 +107,17 @@ def main() -> None:
     logging.getLogger("pyctcdecode").setLevel(logging.ERROR)
 
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
-    vocab_path = resolve_vocab_path(args.checkpoint, args.vocab_path)
-    processor = build_processor(vocab_path)
+    if args.hf_processor:
+        from transformers import AutoProcessor
+
+        processor = AutoProcessor.from_pretrained(str(args.checkpoint))
+    else:
+        vocab_path = resolve_vocab_path(args.checkpoint, args.vocab_path)
+        processor = build_processor(vocab_path)
     labels = build_ctc_labels(processor.tokenizer)
     word_delimiter = processor.tokenizer.word_delimiter_token
 
-    model = AutoModelForCTC.from_pretrained(args.checkpoint).to(device)
+    model = AutoModelForCTC.from_pretrained(str(args.checkpoint)).to(device)
     model.eval()
 
     full_ds = load_split(args.dataset_dir, args.split)
