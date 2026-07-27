@@ -110,6 +110,8 @@ key off *predicted* language / decoder-side features only).
 
 | 2026-07-27 | **Phase-2 mystery SOLVED: unseen-language generalization test** | af51 probe transcripts identify the 1,500 clips as **Acholi/Lango, Runyankole-Rukiga, Lusoga, Lumasaba** etc — not lin/lug/sna. Both in-house LIDs coerced clips into the trio; the champion transliterated correctly-heard content into Luganda phonology (ID_TBDTM comparison is the smoking gun) → 0.2829. Leaders (~0.65) run multilingual African models. **Pivot: af51 (previously discarded for Phase-1 domains) becomes the primary Phase-2 engine.** Submission `phase2_af51.csv`; refinement ladder = beams, normalization A/B, language forcing. | `outputs/analysis/phase2_whisper_lid_probe.csv` |
 
+| 2026-07-27 | **`phase2_af51.csv` → PUBLIC 0.6773, RANK 2** | af51 full-set transcription (greedy, language_safe-normalized) jumped 0.283→0.6773 (WER 0.5005/CER 0.1449) — #2 behind Sophey (0.7087, WER 0.4588/CER 0.1237; gap 0.0314). Refinement ladder: beam-5 re-decode (running), Sunbird Ugandan-language ASR as alternative engine A/B, normalization A/B, per-cluster routing between engines. | Zindi submissions page |
+
 ## 7. Answers to the five closing questions
 
 1. **Truly at the acoustic ceiling?** For *multilingual training on the mixes tried* — yes
