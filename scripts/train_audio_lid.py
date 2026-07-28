@@ -38,6 +38,7 @@ LANGS = ["lin", "lug", "sna"]
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, required=True)
+    parser.add_argument("--languages", nargs="+", default=list(LANGS), help="Language label set for the probe.")
     parser.add_argument("--train-dataset-dir", type=Path, required=True)
     parser.add_argument("--train-split", default="train")
     parser.add_argument("--eval-dataset-dir", type=Path, default=None)
@@ -93,6 +94,7 @@ def extract_features(model, processor, ds, *, batch_size: int, device, label: st
 
 def main() -> None:
     args = parse_args()
+    LANGS[:] = args.languages  # module-level label set used throughout
     import numpy as np
     import torch
     from transformers import AutoModelForCTC

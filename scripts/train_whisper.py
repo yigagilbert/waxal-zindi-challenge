@@ -22,6 +22,9 @@ class DataCollatorSpeechSeq2SeqWithPadding:
 
     processor: Any
     decoder_start_token_id: int
+    # Optional (text, language) -> label ids builder for per-sample language
+    # conditioning (e.g. SALT repurposed language slots). None = plain tokenizer.
+    label_builder: Any = None
 
     def __call__(self, features):
         import torch
@@ -44,6 +47,11 @@ class DataCollatorSpeechSeq2SeqWithPadding:
 
         if "labels" in features[0]:
             label_features = [{"input_ids": feature["labels"]} for feature in features]
+        elif self.label_builder is not None:
+            label_features = [
+                {"input_ids": self.label_builder(str(feature["transcription"]), feature.get("language"))}
+                for feature in features
+            ]
         else:
             label_features = [
                 {"input_ids": self.processor.tokenizer(str(feature["transcription"])).input_ids}
@@ -101,6 +109,58 @@ def main() -> None:
         language_set = set(languages)
         train_ds = train_ds.filter(lambda row: row["language"] in language_set)
         eval_ds = eval_ds.filter(lambda row: row["language"] in language_set)
+
+    # Mix in additional prepared DatasetDicts (e.g. the lin/lug/sna trio from
+    # data/processed alongside the Phase-2 languages from data/phase2_train).
+    extra_dirs = config.get("data", {}).get("extra_dataset_dirs") or []
+    if extra_dirs:
+        from datasets import concatenate_datasets
+
+        keep_cols = ["ID", "audio", "transcription", "language"]
+
+        def align(ds):
+            return ds.select_columns([c for c in keep_cols if c in ds.column_names])
+
+        train_parts, eval_parts = [align(train_ds)], [align(eval_ds)]
+        for extra_dir in extra_dirs:
+            extra = load_from_disk(Path(extra_dir) / "hf_dataset")
+            extra_train, extra_eval = extra["train"], extra.get("validation")
+            if languages:
+                extra_train = extra_train.filter(lambda row: row["language"] in language_set)
+                if extra_eval is not None:
+                    extra_eval = extra_eval.filter(lambda row: row["language"] in language_set)
+            train_parts.append(align(extra_train))
+            if extra_eval is not None:
+                eval_parts.append(align(extra_eval))
+            print(f"Mixed in {extra_dir}: train +{len(extra_train)}, eval +{len(extra_eval) if extra_eval is not None else 0}")
+        train_ds = concatenate_datasets(train_parts)
+        eval_ds = concatenate_datasets(eval_parts)
+
+    def cap_per_language(ds, cap, seed):
+        if not cap:
+            return ds
+        import random as _random
+        from collections import defaultdict
+
+        idx_by_lang = defaultdict(list)
+        for i, lang in enumerate(ds["language"]):
+            idx_by_lang[lang].append(i)
+        rng = _random.Random(seed)
+        selected = []
+        for lang, idxs in sorted(idx_by_lang.items()):
+            rng.shuffle(idxs)
+            selected.extend(idxs[:cap])
+        selected.sort()
+        print(f"Per-language cap {cap}: {len(ds)} -> {len(selected)} rows "
+              f"({ {l: min(len(v), cap) for l, v in sorted(idx_by_lang.items())} })")
+        return ds.select(selected)
+
+    seed_value = int(config.get("training_args", {}).get("seed", 42))
+    train_ds = cap_per_language(train_ds, config.get("data", {}).get("max_train_per_language"), seed_value)
+    eval_ds = cap_per_language(eval_ds, config.get("data", {}).get("max_eval_per_language"), seed_value)
+    if extra_dirs:
+        train_ds = train_ds.shuffle(seed=seed_value)
+
     if args.max_train_samples is not None:
         train_ds = train_ds.select(range(min(len(train_ds), args.max_train_samples)))
     if args.max_eval_samples is not None:
@@ -117,6 +177,34 @@ def main() -> None:
     model = WhisperForConditionalGeneration.from_pretrained(model_name, torch_dtype=_torch.float32)
     model.config.forced_decoder_ids = None
     model.config.suppress_tokens = []
+
+    # Per-sample language conditioning: data.language_tokens maps language -> decoder
+    # token (int = raw slot id, e.g. SALT's ach=50357; str = a token like "<|ln|>").
+    # Labels become <|sot|><|lang|><|transcribe|><|notimestamps|> text <|eot|> so the
+    # fine-tuned model decodes best with the same forced prefix at inference.
+    tokenizer = processor.tokenizer
+    language_tokens_cfg = config.get("data", {}).get("language_tokens") or {}
+    language_token_ids: dict[str, int] = {}
+    for lang, tok in language_tokens_cfg.items():
+        tid = tok if isinstance(tok, int) else tokenizer.convert_tokens_to_ids(str(tok))
+        if tid is None or tid == tokenizer.unk_token_id:
+            raise ValueError(f"language token {tok!r} for '{lang}' not in tokenizer vocab")
+        language_token_ids[lang] = int(tid)
+    if language_token_ids:
+        print(f"Language-conditioned labels: {language_token_ids}")
+        sot_id = tokenizer.convert_tokens_to_ids("<|startoftranscript|>")
+        transcribe_id = tokenizer.convert_tokens_to_ids("<|transcribe|>")
+        notimestamps_id = tokenizer.convert_tokens_to_ids("<|notimestamps|>")
+        eot_id = tokenizer.eos_token_id
+
+        def build_labels(text: str, language: str | None) -> list[int]:
+            lang_id = language_token_ids.get(language or "")
+            if lang_id is None:
+                raise ValueError(f"no language token configured for language {language!r}")
+            text_ids = tokenizer(str(text), add_special_tokens=False).input_ids
+            return [sot_id, lang_id, transcribe_id, notimestamps_id, *text_ids, eot_id]
+    else:
+        build_labels = None
     if config["training_args"].get("gradient_checkpointing", False):
         model.config.use_cache = False
 
@@ -127,7 +215,10 @@ def main() -> None:
             sampling_rate=16_000,
             do_normalize=True,
         ).input_features[0]
-        labels = processor.tokenizer(str(example["transcription"])).input_ids
+        if build_labels is not None:
+            labels = build_labels(str(example["transcription"]), example.get("language"))
+        else:
+            labels = processor.tokenizer(str(example["transcription"])).input_ids
         return {
             "input_features": features,
             "labels": labels,
@@ -161,6 +252,7 @@ def main() -> None:
     data_collator = DataCollatorSpeechSeq2SeqWithPadding(
         processor=processor,
         decoder_start_token_id=model.config.decoder_start_token_id,
+        label_builder=build_labels,
     )
 
     def compute_metrics(eval_pred):

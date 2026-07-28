@@ -86,11 +86,12 @@ Unclear and treated as unsafe for direct training:
 | `huwenjie333/whisper-v3-ft-af51` | Openly available pretrained model (public HF repo) — "You may use pretrained models as long as they are openly available to everyone" | **USED for Phase-2 submissions from 2026-07-27** (`phase2_af51*.csv`): Phase 2 is an unseen-language generalization test (Acholi/Lango, Runyankole-Rukiga, Lusoga, Lumasaba, …) outside lin/lug/sna; af51's 51-African-language coverage makes it the appropriate engine there. (Phase-1 evaluation: WAXAL-lin 0.3397 vs champion 0.1683 — not used for Phase 1.) Inference-only; no fine-tuning performed on it. |
 | `Sunbird/asr-whisper-51-african-languages` | Openly available pretrained model (gated public HF repo — anyone can accept terms; ours accepted 2026-07-28) | Candidate Phase-2 engine A/B vs af51; reportedly strongest when given the per-clip language code. Inference-only unless a fine-tune is logged here. |
 
-Phase-2 fine-tuning data (planned 2026-07-28): `google/WaxalNLP` — the official challenge
-dataset family — has train configs for the Phase-2 languages (ach_asr, nyn_asr, xog_asr,
-myx_asr, …). Using those official train splits to adapt an openly-available engine is within
-the same rule posture as Phase-1 training on lin/lug/sna WAXAL data. Phase-2 *test* clips are
-never used for training.
+Phase-2 fine-tuning (wired 2026-07-28, config `configs/whisper_salt_phase2_lora.yaml`):
+LoRA adaptation of `Sunbird/asr-whisper-large-v3-salt` on `google/WaxalNLP` official train
+splits — BOTH the challenge trio (lin/lug/sna, keeping the expected training languages) AND
+the Phase-2 languages (ach/nyn/xog/myx). All data is the official challenge dataset family;
+the engine is openly available; Phase-2 *test* clips are never used for training. Log the
+resulting adapter checkpoint here if a submission uses it.
 
 ## Phase 1 Decision
 

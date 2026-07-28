@@ -1,0 +1,70 @@
+run_name: whisper_salt_phase2_lora
+# Phase-2 endgame bet (2026-07-28): in-domain adaptation of Sunbird SALT whisper-large-v3.
+# The base already knows ach/nyn/xog/myx/lug (SALT language slots); we adapt it on
+# official WaxalNLP train data for those languages PLUS the challenge trio lin/lug/sna
+# (the challenge expects training on the official languages; multilingual mixing also
+# regularizes). Labels are language-conditioned via data.language_tokens — SALT's
+# repurposed slots for the Ugandan languages, stock whisper <|ln|>/<|sn|> for lin/sna —
+# so inference MUST force the same per-clip tokens (run_whisper_inference --language-csv
+# with numeric ids). In-loop eval generates WITHOUT forcing -> trend-only, as always;
+# the real gate is an external forced decode on data/phase2_train/validation.csv.
+model:
+  name: Sunbird/asr-whisper-large-v3-salt
+data:
+  dataset_dir: data/phase2_train          # from scripts/prepare_phase2_train.py
+  extra_dataset_dirs:
+    - data/processed                      # WAXAL lin/lug/sna trio
+  languages: null
+  max_train_per_language: 6000            # balance: trio has ~17k/lang, phase-2 sizes TBD
+  max_eval_per_language: 200              # keep generation eval affordable
+  lazy_preprocessing: true                # mels in the collator; needs remove_unused_columns: false
+  language_tokens:
+    ach: 50357
+    nyn: 50354
+    xog: 50352
+    myx: 50349
+    lug: 50355
+    lin: "<|ln|>"                         # stock whisper Lingala token (SALT has no lin slot)
+    sna: "<|sn|>"                         # stock whisper Shona token
+lora:
+  enabled: true
+  r: 32                                   # language adaptation needs more capacity than the
+  lora_alpha: 64                          # failed cross-domain r16 q/v attempt; full-module set
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - fc1
+    - fc2
+  lora_dropout: 0.05
+  bias: none
+evaluation:
+  normalization: starter_lower
+tracking:
+  report_to: none
+  local_dir: outputs/experiments
+training_args:
+  output_dir: checkpoints/whisper_salt_phase2_lora
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 8          # effective batch 16
+  per_device_eval_batch_size: 16
+  learning_rate: 2.0e-4
+  warmup_steps: 200
+  max_steps: 4000                         # ~64k samples; extend only if trajectory earns it
+  gradient_checkpointing: true
+  bf16: true
+  fp16: false
+  eval_strategy: steps
+  save_strategy: steps
+  predict_with_generate: true
+  generation_max_length: 225              # phase-2 clips run longer than the trio's ~40 tokens
+  save_steps: 500
+  eval_steps: 500
+  logging_steps: 50
+  load_best_model_at_end: true
+  metric_for_best_model: eval_loss        # in-loop generate is unforced -> eval_loss is the honest signal
+  greater_is_better: false
+  save_total_limit: 2
+  seed: 42
+  remove_unused_columns: false

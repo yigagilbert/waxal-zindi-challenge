@@ -47,11 +47,31 @@ Refinement ladder (one variable per submission, 5/day, close 2026-08-03):
 3. **Splice / per-cluster routing** (`scripts/splice_predictions.py`): SALT-forced overlay for
    clustered clips + af51 base for `unk` clips costs no extra GPU time; later route each
    cluster to whichever engine wins it (native-speaker eyeball proved decisive before).
-4. **In-domain fine-tune** (CONFIRMED possible 07-28: WaxalNLP HAS train configs for the
-   Phase-2 languages — ach_asr, nyn_asr, xog_asr, myx_asr): fine-tune the SALT/51-lang engine
-   on those splits with `scripts/train_whisper.py` — in-domain beat external transfer every
-   time in Phase 1; likely the endgame lever. Start early: deadline 2026-08-03.
-5. Beam 8–10 / temperature-fallback decode; length-penalty tuning.
+4. **In-domain fine-tune — ENDGAME LEVER, fully wired 07-28** (WaxalNLP confirmed to have
+   train configs for the Phase-2 languages). SALT model as starting point, adapted on
+   WaxalNLP ach/nyn/xog/myx + the challenge trio lin/lug/sna (the challenge expects trio
+   training; the mix also regularizes). Labels are language-conditioned (SALT slots for
+   Ugandan languages, stock `<|ln|>`/`<|sn|>` for lin/sna) — inference must force the same
+   tokens. Launch (tmux):
+   ```bash
+   python scripts/prepare_phase2_train.py --languages ach nyn xog myx \
+     --max-per-language 8000 --output-dir data/phase2_train
+   # trio: data/processed from prepare_dataset.py (Phase-1 restore §3); config mixes it in
+   python scripts/train_whisper.py --config configs/whisper_salt_phase2_lora.yaml
+   ```
+   Smoke first: `--max-train-samples 64 --max-eval-samples 32 --max-steps 20`.
+   GATE (external, in-loop eval is unforced/trend-only): forced beam-5 decode of the
+   adapter on data/phase2_train validation per language; submit only if it beats the SALT
+   base on the same clips. Inference with adapter:
+   `run_whisper_inference.py --model-name Sunbird/asr-whisper-large-v3-salt --adapter-path
+   checkpoints/whisper_salt_phase2_lora/checkpoint-XXXX --language-csv ... --language-map
+   ach=50357 nyn=50354 xog=50352 myx=50349`. Push adapter checkpoints to HF immediately.
+5. **Audio LID retrain** (optional, sharpens the 271 unk clips + validates text clusters):
+   `train_audio_lid.py --languages ach nyn xog myx --train-dataset-dir data/phase2_train
+   --checkpoint champion/checkpoint-24000 --predict-dataset-dir data/phase2_processed`
+   (probe is encoder-agnostic; champion encoder worked at 99.4% val on the trio).
+   Route any confident unk reassignments through splice_predictions.
+6. Beam 8–10 / temperature-fallback decode; length-penalty tuning.
 
 
 Bootstraps a brand-new GPU box (e.g. Vast RTX 4090) to full campaign state in ~3–4 h.
