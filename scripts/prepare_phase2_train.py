@@ -79,11 +79,12 @@ def main() -> None:
         import csv
 
         val = dataset_dict["validation"]
+        # ID,Target header: what references_from_validation_csv/evaluate_predictions expect.
         with (out / "validation.csv").open("w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=["ID", "language", "transcription"])
+            writer = csv.DictWriter(f, fieldnames=["ID", "language", "Target"])
             writer.writeheader()
             for example_id, lang, text in zip(val["ID"], val["language"], val["transcription"], strict=True):
-                writer.writerow({"ID": example_id, "language": lang, "transcription": text})
+                writer.writerow({"ID": example_id, "language": lang, "Target": text})
         print(f"Wrote {out / 'validation.csv'} ({len(val)} rows) for external eval gates")
 
     (out / "prepare_report.json").write_text(json.dumps(report, indent=2))

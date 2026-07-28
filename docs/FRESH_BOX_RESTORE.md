@@ -1,77 +1,141 @@
 # Fresh-Box Restore Runbook
 
-## ⚡ Phase-2 quickstart (use this from 2026-07-28 on; full Phase-1 restore below is only for champion work)
+## ⚡ Phase-2 new-VM playbook (definitive from 2026-07-28; Phase-1 restore below only for champion work)
 
-State as of 2026-07-27 night: **rank 2 @ 0.6817** (`phase2_af51_beam5.csv`, SELECTED); greedy was
-0.6773; #1 Sophey 0.7087 (gap 0.0270). Engine: `huwenjie333/whisper-v3-ft-af51` (Phase 2 =
-unseen Ugandan languages: Acholi/Lango, Runyankole-Rukiga, Lusoga, Lumasaba).
+State: best **0.6835** (`phase2_af51_beam5_rawtext.csv` — keep SELECTED until beaten; RAW
+punctuation/casing is canonical, references contain punctuation). Rank 8; #1 eTHER 0.7177
+(gap 0.0342). Language map (transcript LID): ach 477 / nyn 401 / myx 267 / xog 84 / unk 271.
+Close 2026-08-03, 5 submissions/day, one variable per submission.
 
-Fresh box to decoding in ~20 min:
+### 0. Rent the GPU (Vast.ai)
+
+**Recommended: 1× A100 80GB SXM** (~$1.1–1.4/hr) — the LoRA fine-tune is the long pole and
+runs ~4–5h there vs ~10–13h on a 4090; 80GB also allows batch-16 eval generation and a
+full-fine-tune fallback. Filters: disk **≥ 200GB**, CUDA ≥ 12.1 image, inet_down ≥ 500 Mbps,
+verified host. Acceptable alternates: H100 80GB (faster, pricier), RTX 4090 24GB (works —
+config is sized for it — but serializes the week), RTX 5090 32GB (cheap; needs the Blackwell
+torch fix boxed below). Budget through close at A100 rates: ~$60–90.
+On 80GB set `per_device_train_batch_size: 8, gradient_accumulation_steps: 2` in the config
+(same effective 16).
+
+### 1. Environment (~10 min)
+
 ```bash
 git clone https://github.com/yigagilbert/waxal-zindi-challenge && cd waxal-zindi-challenge
+pip install uv 2>/dev/null || true
 uv pip install --system "datasets>=3.0,<4" soundfile librosa "transformers>=4.46" torch \
-  pyctcdecode kenlm huggingface_hub peft accelerate && huggingface-cli login
+  huggingface_hub peft accelerate jiwer pyyaml
+huggingface-cli login   # token MUST have accepted: google/WaxalNLP,
+                        # Sunbird/asr-whisper-large-v3-salt, Sunbird/asr-whisper-51-african-languages
+nvidia-smi              # confirm GPU + VRAM; if sm_120 (5090/Blackwell) apply the torch fix below
+tmux new -s main        # window 0 = decode/submissions, window 1 = training (Ctrl-b c)
+```
+(pyctcdecode/kenlm are Phase-1-only — skip unless doing champion work.)
+
+### 2. Phase-2 data + prior artifacts (~10 min)
+
+```bash
 mkdir -p data/phase2 && cd data/phase2 \
   && curl -LO https://storage.googleapis.com/waxalphase2/audio.zip && unzip -q audio.zip && cd ../..
-# Test_phase2.csv: scp from Mac, or pull from the artifacts repo:
-python -c "from huggingface_hub import hf_hub_download; import shutil; shutil.copy(hf_hub_download('yigagilbert/waxal-private-artifacts','phase2/Test_phase2.csv',repo_type='dataset'),'data/phase2/Test_phase2.csv')"
-python scripts/prepare_phase2_test.py --audio-dir data/phase2/audio --test-csv data/phase2/Test_phase2.csv
-# af51 downloads itself on first inference. All 07-27 outputs live in
-# yigagilbert/waxal-private-artifacts under phase2/ (predictions, submissions, analysis, audio_lid).
+huggingface-cli download yigagilbert/waxal-private-artifacts --repo-type dataset \
+  --include "phase2/*" --local-dir artifacts_phase2   # Test_phase2.csv, all 07-27/28 predictions, routing table
+cp artifacts_phase2/phase2/Test_phase2.csv data/phase2/
+mkdir -p outputs/analysis outputs/predictions
+cp artifacts_phase2/phase2/analysis/phase2_language_clusters.csv outputs/analysis/
+cp artifacts_phase2/phase2/predictions/phase2_af51_beam5_raw.csv outputs/predictions/ \
+  || ls artifacts_phase2/phase2/predictions/   # find the raw beam-5 af51 file if named differently
+python scripts/prepare_phase2_test.py --audio-dir data/phase2/audio \
+  --test-csv data/phase2/Test_phase2.csv          # -> data/processed_phase2 (1500 clips, 0 missing)
 ```
 
-Refinement ladder (one variable per submission, 5/day, close 2026-08-03):
-1. ~~Raw-text A/B~~ — DONE 07-28: **0.6835** (beat normalized 0.6817). Raw punctuation/casing
-   is canonical for all Phase-2 submissions; references contain punctuation. Rank 8, #1 = 0.7177.
-2. **LID → language-forced decoding** (current rung): per-clip language codes from
-   `scripts/cluster_phase2_languages.py` (map: ach 477 / nyn 401 / myx 267 / xog 84 / unk 271;
-   routing table at `yigagilbert/waxal-private-artifacts` → `phase2/analysis/phase2_language_clusters.csv`).
-   Primary engine: **`Sunbird/asr-whisper-large-v3-salt`** (gated; terms accepted 07-28) —
-   supports ALL four Phase-2 clusters via repurposed stock Whisper language slots
-   (SALT_LANGUAGE_TOKENS_WHISPER): ach=50357, nyn=50354, xog=50352, myx=50349
-   (also lug=50355, teo=50353, lgg=50356, ttj=50351, kin=50350, swa=50318, eng=50259).
-   Pass raw token ids through `--language-map`:
-   ```bash
-   python -c "from huggingface_hub import hf_hub_download; import shutil; shutil.copy(hf_hub_download('yigagilbert/waxal-private-artifacts','phase2/analysis/phase2_language_clusters.csv',repo_type='dataset'),'outputs/analysis/phase2_language_clusters.csv')"
-   python scripts/run_whisper_inference.py --model-name Sunbird/asr-whisper-large-v3-salt \
-     --dataset-dir data/phase2_processed --split test --num-beams 5 --max-new-tokens 220 --batch-size 8 \
-     --language-csv outputs/analysis/phase2_language_clusters.csv \
-     --language-map ach=50357 nyn=50354 xog=50352 myx=50349 \
-     --output outputs/predictions/phase2_salt_forced_beam5_raw.csv
-   ```
-   `unk` rows auto-detect (risky on a repurposed-token model — see splice below). Secondary
-   engine A/B: `Sunbird/asr-whisper-51-african-languages` same command (check its code
-   convention on the box first — tokenizer added tokens vs SALT-style raw ids). NO
-   normalization; merge with `merge_predictions.py --order`, wc -l 1501, submit. Both models
-   disclosed in docs/RULES_AND_DATA_USE.md.
-3. **Splice / per-cluster routing** (`scripts/splice_predictions.py`): SALT-forced overlay for
-   clustered clips + af51 base for `unk` clips costs no extra GPU time; later route each
-   cluster to whichever engine wins it (native-speaker eyeball proved decisive before).
-4. **In-domain fine-tune — ENDGAME LEVER, fully wired 07-28** (WaxalNLP confirmed to have
-   train configs for the Phase-2 languages). SALT model as starting point, adapted on
-   WaxalNLP ach/nyn/xog/myx + the challenge trio lin/lug/sna (the challenge expects trio
-   training; the mix also regularizes). Labels are language-conditioned (SALT slots for
-   Ugandan languages, stock `<|ln|>`/`<|sn|>` for lin/sna) — inference must force the same
-   tokens. Launch (tmux):
-   ```bash
-   python scripts/prepare_phase2_train.py --languages ach nyn xog myx \
-     --max-per-language 8000 --output-dir data/phase2_train
-   # trio: data/processed from prepare_dataset.py (Phase-1 restore §3); config mixes it in
-   python scripts/train_whisper.py --config configs/whisper_salt_phase2_lora.yaml
-   ```
-   Smoke first: `--max-train-samples 64 --max-eval-samples 32 --max-steps 20`.
-   GATE (external, in-loop eval is unforced/trend-only): forced beam-5 decode of the
-   adapter on data/phase2_train validation per language; submit only if it beats the SALT
-   base on the same clips. Inference with adapter:
-   `run_whisper_inference.py --model-name Sunbird/asr-whisper-large-v3-salt --adapter-path
-   checkpoints/whisper_salt_phase2_lora/checkpoint-XXXX --language-csv ... --language-map
-   ach=50357 nyn=50354 xog=50352 myx=50349`. Push adapter checkpoints to HF immediately.
-5. **Audio LID retrain** (optional, sharpens the 271 unk clips + validates text clusters):
-   `train_audio_lid.py --languages ach nyn xog myx --train-dataset-dir data/phase2_train
-   --checkpoint champion/checkpoint-24000 --predict-dataset-dir data/phase2_processed`
-   (probe is encoder-agnostic; champion encoder worked at 99.4% val on the trio).
-   Route any confident unk reassignments through splice_predictions.
-6. Beam 8–10 / temperature-fallback decode; length-penalty tuning.
+### 3. Submission track FIRST (window 0, ~2h GPU): SALT forced-language decode
+
+SALT (`Sunbird/asr-whisper-large-v3-salt`) supports all four clusters via repurposed stock
+Whisper slots (SALT_LANGUAGE_TOKENS_WHISPER): ach=50357, nyn=50354, xog=50352, myx=50349
+(also lug=50355, teo=50353, lgg=50356, ttj=50351, kin=50350, swa=50318, eng=50259).
+```bash
+python scripts/run_whisper_inference.py --model-name Sunbird/asr-whisper-large-v3-salt \
+  --dataset-dir data/processed_phase2 --split test --num-beams 5 --max-new-tokens 220 --batch-size 8 \
+  --language-csv outputs/analysis/phase2_language_clusters.csv \
+  --language-map ach=50357 nyn=50354 xog=50352 myx=50349 \
+  --output outputs/predictions/phase2_salt_forced_beam5_raw.csv
+head -12 outputs/predictions/phase2_salt_forced_beam5_raw.csv   # eyeball orthography per cluster first
+python scripts/merge_predictions.py --predictions outputs/predictions/phase2_salt_forced_beam5_raw.csv \
+  --order data/phase2/Test_phase2.csv --output outputs/submissions/phase2_salt_forced_beam5.csv
+wc -l outputs/submissions/phase2_salt_forced_beam5.csv          # must be 1501
+```
+**Submission 1** = that file, NO normalization. **Submission 2** (zero GPU) = splice — SALT for
+clustered clips, proven af51 for the 271 `unk` (SALT auto-detect on repurposed slots is
+untrustworthy):
+```bash
+python scripts/splice_predictions.py \
+  --base outputs/predictions/phase2_af51_beam5_raw.csv \
+  --overlay outputs/predictions/phase2_salt_forced_beam5_raw.csv \
+  --routing outputs/analysis/phase2_language_clusters.csv \
+  --overlay-languages ach nyn xog myx \
+  --output outputs/predictions/phase2_salt_af51_spliced.csv
+python scripts/merge_predictions.py --predictions outputs/predictions/phase2_salt_af51_spliced.csv \
+  --order data/phase2/Test_phase2.csv --output outputs/submissions/phase2_salt_af51_spliced.csv
+```
+**Submission 3 (optional A/B)**: `Sunbird/asr-whisper-51-african-languages`, same command —
+but first check its language-code convention (SALT-style raw ids vs real `<|ach|>` tokens):
+`python -c "from transformers import AutoTokenizer; t=AutoTokenizer.from_pretrained('Sunbird/asr-whisper-51-african-languages'); print([x for x in t.additional_special_tokens if 'ach' in x or 'nyn' in x][:10])"`
+
+### 4. Training data (window 1, network/CPU — start while step 3 decodes)
+
+```bash
+python scripts/prepare_phase2_train.py --languages ach nyn xog myx \
+  --max-per-language 8000 --output-dir data/phase2_train     # WaxalNLP phase-2 langs; prints row counts
+export WAXAL_RAW_DIR=$PWD/google-waxal-asr-challenge20260630-10570-elxebu   # git-tracked CSVs
+python scripts/prepare_dataset.py --raw-dir "$WAXAL_RAW_DIR" --splits train validation
+  # -> data/processed = the challenge trio lin/lug/sna (~18GB; run in tmux)
+```
+
+### 5. Fine-tune: SALT + trio + phase-2 languages (endgame lever)
+
+Language-conditioned labels (SALT slots for Ugandan langs, stock `<|ln|>`/`<|sn|>` for
+lin/sna — the challenge expects trio training; the mix also regularizes). Config:
+`configs/whisper_salt_phase2_lora.yaml` (LoRA r32 all-modules, lr 2e-4, 4000 steps, eff. batch 16).
+```bash
+python scripts/train_whisper.py --config configs/whisper_salt_phase2_lora.yaml \
+  --max-train-samples 64 --max-eval-samples 32 --max-steps 20        # SMOKE first
+python scripts/train_whisper.py --config configs/whisper_salt_phase2_lora.yaml  # real run (tmux!)
+# push every saved checkpoint to HF immediately (boxes die):
+python -c "from huggingface_hub import HfApi; HfApi().upload_folder(folder_path='checkpoints/whisper_salt_phase2_lora', path_in_repo='whisper_salt_phase2_lora', repo_id='yigagilbert/waxal-private-artifacts', repo_type='dataset', ignore_patterns=['**/optimizer.pt','**/rng_state*'])"
+```
+In-loop eval generates WITHOUT language forcing → trend-only (Phase-1 lesson). The honest
+**GATE** is an external forced decode on the held-out WaxalNLP validation, adapter vs base:
+```bash
+for M in "" "--adapter-path checkpoints/whisper_salt_phase2_lora/checkpoint-XXXX"; do \
+python scripts/run_whisper_inference.py --model-name Sunbird/asr-whisper-large-v3-salt $M \
+  --dataset-dir data/phase2_train --split validation --max-samples 800 \
+  --num-beams 5 --max-new-tokens 220 --batch-size 8 \
+  --language-csv data/phase2_train/validation.csv \
+  --language-map ach=50357 nyn=50354 xog=50352 myx=50349 \
+  --output outputs/predictions/salt_val_$([ -n "$M" ] && echo adapter || echo base).csv; done
+python scripts/evaluate_predictions.py --predictions outputs/predictions/salt_val_base.csv \
+  --references data/phase2_train/validation.csv --normalization all --output outputs/analysis/salt_val_base.json
+python scripts/evaluate_predictions.py --predictions outputs/predictions/salt_val_adapter.csv \
+  --references data/phase2_train/validation.csv --normalization all --output outputs/analysis/salt_val_adapter.json
+```
+Adapter must beat base per-language on raw/loosest normalization to earn a test-set
+submission (then: step-3 command + `--adapter-path`, splice unk from af51, submit).
+
+### 6. Optional rungs (only if 5 is running/blocked)
+
+- **Audio LID retrain** (sharpens the 271 unk clips; validates text clusters):
+  `python scripts/train_audio_lid.py --languages ach nyn xog myx --checkpoint <any encoder;
+  champion/checkpoint-24000 or pull from HF> --train-dataset-dir data/phase2_train
+  --predict-dataset-dir data/processed_phase2 --predict-split test` — route confident unk
+  reassignments through splice_predictions.
+- Beam 8–10 / length-penalty / temperature-fallback on the best engine.
+
+### Standing rules
+
+Raw text (no normalization) for every Phase-2 submission · one variable per submission ·
+keep the best submission SELECTED on Zindi · push predictions/submissions/checkpoints to
+`yigagilbert/waxal-private-artifacts` under `phase2/` the moment they exist · every model/
+dataset used gets a docs/RULES_AND_DATA_USE.md entry · never overwrite champion artifacts.
 
 
 Bootstraps a brand-new GPU box (e.g. Vast RTX 4090) to full campaign state in ~3–4 h.
