@@ -26,25 +26,31 @@ Refinement ladder (one variable per submission, 5/day, close 2026-08-03):
 2. **LID → language-forced decoding** (current rung): per-clip language codes from
    `scripts/cluster_phase2_languages.py` (map: ach 477 / nyn 401 / myx 267 / xog 84 / unk 271;
    routing table at `yigagilbert/waxal-private-artifacts` → `phase2/analysis/phase2_language_clusters.csv`).
-   Engine: `Sunbird/asr-whisper-51-african-languages` (gated — accept terms first; reportedly
-   strongest WITH the language code). Command:
+   Primary engine: **`Sunbird/asr-whisper-large-v3-salt`** (gated; terms accepted 07-28) —
+   supports ALL four Phase-2 clusters via repurposed stock Whisper language slots
+   (SALT_LANGUAGE_TOKENS_WHISPER): ach=50357, nyn=50354, xog=50352, myx=50349
+   (also lug=50355, teo=50353, lgg=50356, ttj=50351, kin=50350, swa=50318, eng=50259).
+   Pass raw token ids through `--language-map`:
    ```bash
    python -c "from huggingface_hub import hf_hub_download; import shutil; shutil.copy(hf_hub_download('yigagilbert/waxal-private-artifacts','phase2/analysis/phase2_language_clusters.csv',repo_type='dataset'),'outputs/analysis/phase2_language_clusters.csv')"
-   python scripts/run_whisper_inference.py --model-name Sunbird/asr-whisper-51-african-languages \
+   python scripts/run_whisper_inference.py --model-name Sunbird/asr-whisper-large-v3-salt \
      --dataset-dir data/phase2_processed --split test --num-beams 5 --max-new-tokens 220 --batch-size 8 \
      --language-csv outputs/analysis/phase2_language_clusters.csv \
-     --output outputs/predictions/phase2_sunbird51_forced_beam5_raw.csv
+     --language-map ach=50357 nyn=50354 xog=50352 myx=50349 \
+     --output outputs/predictions/phase2_salt_forced_beam5_raw.csv
    ```
-   Verify the code labels the model expects first (ach/nyn/xog/myx assumed — check its
-   tokenizer/model card; use `--language-map ach=<code> ...` to translate). `unk` rows
-   auto-detect. NO normalization; merge with `merge_predictions.py --order`, wc -l 1501, submit.
-   Any Sunbird model used must be disclosed in docs/RULES_AND_DATA_USE.md.
-3. **Per-cluster routing between engines** (af51 vs Sunbird-forced): after rung 2, compare
-   per-cluster samples (native-speaker eyeball proved decisive before); splice the winner
-   per cluster using the routing table.
-4. **In-domain fine-tune**: if `google/WaxalNLP` has train configs for the Phase-2 languages
-   (ach/nyn/xog/myx…), fine-tune the 51-lang engine on them — in-domain beat external transfer
-   every time in Phase 1; likely the endgame lever.
+   `unk` rows auto-detect (risky on a repurposed-token model — see splice below). Secondary
+   engine A/B: `Sunbird/asr-whisper-51-african-languages` same command (check its code
+   convention on the box first — tokenizer added tokens vs SALT-style raw ids). NO
+   normalization; merge with `merge_predictions.py --order`, wc -l 1501, submit. Both models
+   disclosed in docs/RULES_AND_DATA_USE.md.
+3. **Splice / per-cluster routing** (`scripts/splice_predictions.py`): SALT-forced overlay for
+   clustered clips + af51 base for `unk` clips costs no extra GPU time; later route each
+   cluster to whichever engine wins it (native-speaker eyeball proved decisive before).
+4. **In-domain fine-tune** (CONFIRMED possible 07-28: WaxalNLP HAS train configs for the
+   Phase-2 languages — ach_asr, nyn_asr, xog_asr, myx_asr): fine-tune the SALT/51-lang engine
+   on those splits with `scripts/train_whisper.py` — in-domain beat external transfer every
+   time in Phase 1; likely the endgame lever. Start early: deadline 2026-08-03.
 5. Beam 8–10 / temperature-fallback decode; length-penalty tuning.
 
 

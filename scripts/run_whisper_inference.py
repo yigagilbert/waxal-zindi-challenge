@@ -155,27 +155,33 @@ def main() -> None:
 
     tokenizer = processor.tokenizer
     lang_to_id = getattr(model.generation_config, "lang_to_id", None) or {}
+    sot_id = tokenizer.convert_tokens_to_ids("<|startoftranscript|>")
+    transcribe_id = tokenizer.convert_tokens_to_ids("<|transcribe|>")
+    notimestamps_id = tokenizer.convert_tokens_to_ids("<|notimestamps|>")
 
     def language_gen_kwargs(code: str | None) -> dict:
-        """generate() kwargs that force `code`; empty dict = auto-detect."""
+        """generate() kwargs that force `code`; empty dict = auto-detect.
+
+        `code` may be a language name/ISO code, or a raw decoder token id (all digits)
+        for models that repurpose stock Whisper language slots without renaming the
+        token (e.g. Sunbird SALT: ach=50357, nyn=50354, xog=50352, myx=50349).
+        """
         if code is None:
             return {}
+        if code.isdigit():
+            return {"prefix": [int(code), transcribe_id, notimestamps_id]}
         token = f"<|{code}|>"
         if token in lang_to_id:
             return {"language": code, "task": "transcribe"}
         token_id = tokenizer.convert_tokens_to_ids(token)
         if token_id is not None and token_id != tokenizer.unk_token_id:
-            # Custom language token outside generation_config.lang_to_id:
-            # force <|sot|><|lang|><|transcribe|><|notimestamps|> manually.
-            return {
-                "forced_decoder_ids": [
-                    (1, token_id),
-                    (2, tokenizer.convert_tokens_to_ids("<|transcribe|>")),
-                    (3, tokenizer.convert_tokens_to_ids("<|notimestamps|>")),
-                ]
-            }
+            return {"prefix": [token_id, transcribe_id, notimestamps_id]}
         print(f"WARNING: language '{code}' has no token in this model; auto-detecting those clips.")
         return {}
+
+    # forced_decoder_ids was deprecated/removed in newer transformers; discover the
+    # working mechanism on the first forced batch and stick with it.
+    forcing_mode: dict[str, str | None] = {"mode": None}
 
     all_ids = ds["ID"]
     gen_kwargs_cache: dict[str | None, dict] = {}
@@ -223,15 +229,49 @@ def main() -> None:
             if attention_mask is not None:
                 attention_mask = attention_mask.to(device=device)
 
+            gen_kwargs = dict(
+                input_features=input_features,
+                attention_mask=attention_mask,
+                do_sample=False,
+                num_beams=args.num_beams,
+                max_new_tokens=args.max_new_tokens,
+            )
+            prefix = extra_kwargs.get("prefix")
+            if prefix is None:
+                gen_kwargs.update(extra_kwargs)
             with torch.no_grad():
-                generated = model.generate(
-                    input_features=input_features,
-                    attention_mask=attention_mask,
-                    do_sample=False,
-                    num_beams=args.num_beams,
-                    max_new_tokens=args.max_new_tokens,
-                    **extra_kwargs,
-                )
+                if prefix is None:
+                    generated = model.generate(**gen_kwargs)
+                else:
+                    modes = (
+                        [forcing_mode["mode"]]
+                        if forcing_mode["mode"]
+                        else ["forced_decoder_ids", "decoder_input_ids"]
+                    )
+                    last_exc: Exception | None = None
+                    for mode in modes:
+                        try:
+                            if mode == "forced_decoder_ids":
+                                generated = model.generate(
+                                    **gen_kwargs,
+                                    forced_decoder_ids=[(i + 1, t) for i, t in enumerate(prefix)],
+                                )
+                            else:
+                                decoder_input_ids = torch.tensor(
+                                    [[sot_id, *prefix]] * input_features.shape[0],
+                                    device=device,
+                                    dtype=torch.long,
+                                )
+                                generated = model.generate(**gen_kwargs, decoder_input_ids=decoder_input_ids)
+                        except (TypeError, ValueError) as exc:
+                            last_exc = exc
+                            continue
+                        if forcing_mode["mode"] != mode:
+                            forcing_mode["mode"] = mode
+                            print(f"language forcing via {mode}")
+                        break
+                    else:
+                        raise last_exc
             decoded = processor.batch_decode(generated, skip_special_tokens=True)
             for example_id, pred in zip(batch["ID"], decoded, strict=True):
                 preds_by_id[example_id] = pred.strip()
