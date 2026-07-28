@@ -21,12 +21,31 @@ python scripts/prepare_phase2_test.py --audio-dir data/phase2/audio --test-csv d
 ```
 
 Refinement ladder (one variable per submission, 5/day, close 2026-08-03):
-1. **Raw-text A/B** — `phase2_af51_beam5_rawtext.csv` (already built + on the Mac; NO GPU needed).
-2. **Sunbird engine A/B** — user to name the strongest openly-available Sunbird model for
-   Acholi/Runyankole/Lusoga/Lumasaba; run full-set, compare to 0.6817.
-3. **Per-language routing** between af51 and the Sunbird engine (cluster by af51 transcript
-   language cues or a 4-class audio probe) — the credible path past 0.7087.
-4. Beam 8–10 / temperature-fallback decode; length-penalty tuning.
+1. ~~Raw-text A/B~~ — DONE 07-28: **0.6835** (beat normalized 0.6817). Raw punctuation/casing
+   is canonical for all Phase-2 submissions; references contain punctuation. Rank 8, #1 = 0.7177.
+2. **LID → language-forced decoding** (current rung): per-clip language codes from
+   `scripts/cluster_phase2_languages.py` (map: ach 477 / nyn 401 / myx 267 / xog 84 / unk 271;
+   routing table at `yigagilbert/waxal-private-artifacts` → `phase2/analysis/phase2_language_clusters.csv`).
+   Engine: `Sunbird/asr-whisper-51-african-languages` (gated — accept terms first; reportedly
+   strongest WITH the language code). Command:
+   ```bash
+   python -c "from huggingface_hub import hf_hub_download; import shutil; shutil.copy(hf_hub_download('yigagilbert/waxal-private-artifacts','phase2/analysis/phase2_language_clusters.csv',repo_type='dataset'),'outputs/analysis/phase2_language_clusters.csv')"
+   python scripts/run_whisper_inference.py --model-name Sunbird/asr-whisper-51-african-languages \
+     --dataset-dir data/phase2_processed --split test --num-beams 5 --max-new-tokens 220 --batch-size 8 \
+     --language-csv outputs/analysis/phase2_language_clusters.csv \
+     --output outputs/predictions/phase2_sunbird51_forced_beam5_raw.csv
+   ```
+   Verify the code labels the model expects first (ach/nyn/xog/myx assumed — check its
+   tokenizer/model card; use `--language-map ach=<code> ...` to translate). `unk` rows
+   auto-detect. NO normalization; merge with `merge_predictions.py --order`, wc -l 1501, submit.
+   Any Sunbird model used must be disclosed in docs/RULES_AND_DATA_USE.md.
+3. **Per-cluster routing between engines** (af51 vs Sunbird-forced): after rung 2, compare
+   per-cluster samples (native-speaker eyeball proved decisive before); splice the winner
+   per cluster using the routing table.
+4. **In-domain fine-tune**: if `google/WaxalNLP` has train configs for the Phase-2 languages
+   (ach/nyn/xog/myx…), fine-tune the 51-lang engine on them — in-domain beat external transfer
+   every time in Phase 1; likely the endgame lever.
+5. Beam 8–10 / temperature-fallback decode; length-penalty tuning.
 
 
 Bootstraps a brand-new GPU box (e.g. Vast RTX 4090) to full campaign state in ~3–4 h.

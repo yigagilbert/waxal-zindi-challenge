@@ -56,6 +56,25 @@ def main() -> None:
     parser.add_argument("--max-new-tokens", type=int, default=256)
     parser.add_argument("--num-beams", type=int, default=1)
     parser.add_argument("--device", default=None)
+    parser.add_argument(
+        "--language-csv",
+        type=Path,
+        default=None,
+        help="CSV with ID,language columns: per-clip forced decoder language. "
+        "'unk' or blank means auto-detect for that clip.",
+    )
+    parser.add_argument(
+        "--language-map",
+        nargs="*",
+        default=None,
+        help="Relabel language-csv values before forcing, e.g. --language-map ach=luo myx=lug. "
+        "Map a value to empty (unk=) to leave those clips on auto-detect.",
+    )
+    parser.add_argument(
+        "--force-language",
+        default=None,
+        help="Force a single language code for every clip (overrides --language-csv).",
+    )
     args = parser.parse_args()
 
     try:
@@ -112,50 +131,114 @@ def main() -> None:
         output = Path("outputs/predictions") / f"{clean_name(run_name)}_{args.split}.csv"
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    rows = []
-    for start in range(0, len(ds), args.batch_size):
-        batch = ds[start : start + args.batch_size]
-        audios = [audio["array"] for audio in batch["audio"]]
-        inputs = processor(
-            audios,
-            sampling_rate=16_000,
-            return_tensors="pt",
-            padding="max_length",
-            truncation=True,
-            return_attention_mask=True,
-        )
-        if "input_features" not in inputs:
-            raise ValueError(f"Expected processor to return input_features, got keys: {list(inputs)}")
+    # ---- per-clip language forcing -------------------------------------------
+    id_to_lang: dict[str, str] = {}
+    if args.language_csv is not None:
+        import csv as _csv
 
-        input_features = inputs["input_features"]
+        with args.language_csv.open(encoding="utf-8-sig") as f:
+            for row in _csv.DictReader(f):
+                id_to_lang[row["ID"]] = (row.get("language") or "").strip()
+    remap: dict[str, str] = {}
+    for pair in args.language_map or []:
+        src, _, dst = pair.partition("=")
+        remap[src] = dst
 
-        if input_features.shape[-1] != 3000:
-            raise ValueError(
-                f"Whisper expects input_features length 3000, "
-                f"got shape {tuple(input_features.shape)}"
+    def clip_language(example_id: str) -> str | None:
+        if args.force_language:
+            return args.force_language
+        code = id_to_lang.get(example_id, "")
+        code = remap.get(code, code)
+        if not code or code == "unk":
+            return None
+        return code
+
+    tokenizer = processor.tokenizer
+    lang_to_id = getattr(model.generation_config, "lang_to_id", None) or {}
+
+    def language_gen_kwargs(code: str | None) -> dict:
+        """generate() kwargs that force `code`; empty dict = auto-detect."""
+        if code is None:
+            return {}
+        token = f"<|{code}|>"
+        if token in lang_to_id:
+            return {"language": code, "task": "transcribe"}
+        token_id = tokenizer.convert_tokens_to_ids(token)
+        if token_id is not None and token_id != tokenizer.unk_token_id:
+            # Custom language token outside generation_config.lang_to_id:
+            # force <|sot|><|lang|><|transcribe|><|notimestamps|> manually.
+            return {
+                "forced_decoder_ids": [
+                    (1, token_id),
+                    (2, tokenizer.convert_tokens_to_ids("<|transcribe|>")),
+                    (3, tokenizer.convert_tokens_to_ids("<|notimestamps|>")),
+                ]
+            }
+        print(f"WARNING: language '{code}' has no token in this model; auto-detecting those clips.")
+        return {}
+
+    all_ids = ds["ID"]
+    gen_kwargs_cache: dict[str | None, dict] = {}
+    groups: dict[str | None, list[int]] = {}
+    for idx, example_id in enumerate(all_ids):
+        code = clip_language(example_id) if (id_to_lang or args.force_language) else None
+        groups.setdefault(code, []).append(idx)
+    if len(groups) > 1 or next(iter(groups)) is not None:
+        print("language groups:", {k or "auto": len(v) for k, v in sorted(groups.items(), key=lambda kv: kv[0] or "")})
+
+    preds_by_id: dict[str, str] = {}
+    done = 0
+    for code, indices in groups.items():
+        if code not in gen_kwargs_cache:
+            gen_kwargs_cache[code] = language_gen_kwargs(code)
+        extra_kwargs = gen_kwargs_cache[code]
+        subset = ds.select(indices)
+        for start in range(0, len(subset), args.batch_size):
+            batch = subset[start : start + args.batch_size]
+            audios = [audio["array"] for audio in batch["audio"]]
+            inputs = processor(
+                audios,
+                sampling_rate=16_000,
+                return_tensors="pt",
+                padding="max_length",
+                truncation=True,
+                return_attention_mask=True,
             )
+            if "input_features" not in inputs:
+                raise ValueError(f"Expected processor to return input_features, got keys: {list(inputs)}")
 
-        model_dtype = next(model.parameters()).dtype
+            input_features = inputs["input_features"]
 
-        input_features = input_features.to(device=device, dtype=model_dtype)
+            if input_features.shape[-1] != 3000:
+                raise ValueError(
+                    f"Whisper expects input_features length 3000, "
+                    f"got shape {tuple(input_features.shape)}"
+                )
 
-        attention_mask = inputs.get("attention_mask")
-        if attention_mask is not None:
-            attention_mask = attention_mask.to(device=device)
+            model_dtype = next(model.parameters()).dtype
 
-        with torch.no_grad():
-            generated = model.generate(
-                input_features=input_features,
-                attention_mask=attention_mask,
-                do_sample=False,
-                num_beams=args.num_beams,
-                max_new_tokens=args.max_new_tokens,
-            )
-        decoded = processor.batch_decode(generated, skip_special_tokens=True)
-        for example_id, pred in zip(batch["ID"], decoded, strict=True):
-            rows.append({"ID": example_id, "Target": pred.strip()})
-        print(f"Predicted {len(rows)}/{len(ds)}", flush=True)
+            input_features = input_features.to(device=device, dtype=model_dtype)
 
+            attention_mask = inputs.get("attention_mask")
+            if attention_mask is not None:
+                attention_mask = attention_mask.to(device=device)
+
+            with torch.no_grad():
+                generated = model.generate(
+                    input_features=input_features,
+                    attention_mask=attention_mask,
+                    do_sample=False,
+                    num_beams=args.num_beams,
+                    max_new_tokens=args.max_new_tokens,
+                    **extra_kwargs,
+                )
+            decoded = processor.batch_decode(generated, skip_special_tokens=True)
+            for example_id, pred in zip(batch["ID"], decoded, strict=True):
+                preds_by_id[example_id] = pred.strip()
+            done += len(batch["ID"])
+            print(f"Predicted {done}/{len(ds)} [{code or 'auto'}]", flush=True)
+
+    rows = [{"ID": example_id, "Target": preds_by_id[example_id]} for example_id in all_ids]
     write_csv_rows(output, rows, ["ID", "Target"])
     print(f"Wrote predictions to {output}")
 
