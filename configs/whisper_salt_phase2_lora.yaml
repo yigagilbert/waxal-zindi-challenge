@@ -4,7 +4,7 @@ run_name: whisper_salt_phase2_lora
 # official WaxalNLP train data for those languages PLUS the challenge trio lin/lug/sna
 # (the challenge expects training on the official languages; multilingual mixing also
 # regularizes). Labels are language-conditioned via data.language_tokens — SALT's
-# repurposed slots for the Ugandan languages, stock whisper <|ln|>/<|sn|> for lin/sna —
+# repurposed slots for the Ugandan languages, 50325/50324 for lin/sna (see note below) —
 # so inference MUST force the same per-clip tokens (run_whisper_inference --language-csv
 # with numeric ids). In-loop eval generates WITHOUT forcing -> trend-only, as always;
 # the real gate is an external forced decode on data/phase2_train/validation.csv.
@@ -24,8 +24,12 @@ data:
     xog: 50352
     myx: 50349
     lug: 50355
-    lin: "<|ln|>"                         # stock whisper Lingala token (SALT has no lin slot)
-    sna: "<|sn|>"                         # stock whisper Shona token
+    # sna = stock whisper <|sn|> slot (untouched by SALT). Stock <|ln|> would be 50353,
+    # but SALT repurposed that slot for Ateso (teo) — training lin there would clobber
+    # teo, which auto-detect may still need on the unk residue. Use the untouched
+    # <|yo|> slot instead (no Yoruba ASR exists anywhere in this challenge).
+    lin: 50325
+    sna: 50324
 lora:
   enabled: true
   r: 32                                   # language adaptation needs more capacity than the
@@ -46,8 +50,8 @@ tracking:
   local_dir: outputs/experiments
 training_args:
   output_dir: checkpoints/whisper_salt_phase2_lora
-  per_device_train_batch_size: 2
-  gradient_accumulation_steps: 8          # effective batch 16
+  per_device_train_batch_size: 8          # H100-NVL-95GB sizing; drop to 2 (ga 8) on 24GB
+  gradient_accumulation_steps: 2          # effective batch 16
   per_device_eval_batch_size: 16
   learning_rate: 2.0e-4
   warmup_steps: 200
