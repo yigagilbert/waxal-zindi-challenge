@@ -97,8 +97,11 @@ but first check its language-code convention (SALT-style raw ids vs real `<|ach|
 ### 4. Training data (window 1, network/CPU — start while step 3 decodes)
 
 ```bash
-python scripts/prepare_phase2_train.py --languages ach nyn xog myx \
+python scripts/prepare_phase2_train.py --languages ach nyn sog=xog mas=myx \
   --max-per-language 8000 --output-dir data/phase2_train     # WaxalNLP phase-2 langs; prints row counts
+  # NAMING TRAP (found 07-29): WaxalNLP has NO xog/myx configs — Lusoga is `sog_asr` and
+  # Lumasaba is `mas_asr` (verified by transcript inspection: kh/tsi signatures; NOT Maasai).
+  # hubcode=label keeps output labels aligned with our clusters + the SALT token map.
 export WAXAL_RAW_DIR=$PWD/google-waxal-asr-challenge20260630-10570-elxebu   # git-tracked CSVs
 python scripts/prepare_dataset.py --raw-dir "$WAXAL_RAW_DIR" --splits train validation
   # -> data/processed = the challenge trio lin/lug/sna (~18GB; run in tmux)

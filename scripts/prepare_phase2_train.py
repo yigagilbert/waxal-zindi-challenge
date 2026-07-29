@@ -6,8 +6,11 @@ the WaxalNLP parquet shards for the given languages directly — no Zindi CSV ne
 Output schema matches the trio pipeline (ID, audio, transcription, language) so
 train_whisper.py can concatenate both via data.extra_dataset_dirs.
 
-Usage:
-  python scripts/prepare_phase2_train.py --languages ach nyn xog myx \
+WaxalNLP config codes differ from ISO for two Phase-2 languages (sog = Lusoga/xog,
+mas = Lumasaba/myx — verified by transcript inspection, NOT Maasai). Use hubcode=label
+syntax to load a WaxalNLP code but emit our cluster label:
+
+  python scripts/prepare_phase2_train.py --languages ach nyn sog=xog mas=myx \
     --max-per-language 8000 --output-dir data/phase2_train
 """
 
@@ -23,7 +26,12 @@ ID_COLUMN_CANDIDATES = ("id", "ID", "audio_id", "utterance_id")
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--languages", nargs="+", default=["ach", "nyn", "xog", "myx"])
+    parser.add_argument(
+        "--languages",
+        nargs="+",
+        default=["ach", "nyn", "sog=xog", "mas=myx"],
+        help="WaxalNLP config codes, optionally as hubcode=label (label defaults to hubcode).",
+    )
     parser.add_argument("--splits", nargs="+", default=["train", "validation"])
     parser.add_argument("--max-per-language", type=int, default=None, help="Cap per language per split (shuffled, seeded).")
     parser.add_argument("--sample-rate", type=int, default=16_000)
@@ -35,12 +43,17 @@ def main() -> None:
 
     report: dict = {"languages": args.languages, "splits": {}, "max_per_language": args.max_per_language}
     dataset_dict = {}
+    language_specs = []
+    for spec in args.languages:
+        hub_code, _, label = spec.partition("=")
+        language_specs.append((hub_code, label or hub_code))
+
     for split in args.splits:
         parts = []
-        for lang in args.languages:
+        for hub_code, lang in language_specs:
             # Restrict data_files to this split's shards — selecting by HF config would
             # resolve+download every split including the huge `unlabeled` one.
-            data_files = f"data/ASR/{lang}/{lang}-{split}-*.parquet"
+            data_files = f"data/ASR/{hub_code}/{hub_code}-{split}-*.parquet"
             print(f"Loading google/WaxalNLP {data_files}")
             ds = load_dataset("google/WaxalNLP", data_files=data_files, split="train")
 
