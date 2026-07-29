@@ -7,9 +7,11 @@ language via clusters v1, beam 5, raw — keep SELECTED until beaten). SALT beat
 the SALT+af51-unk splice scored LOWER (0.6967) → **af51 retired; SALT is base engine for
 everything** (splices use SALT as base). Board compressed: ranks 6–26 span 0.709→0.6997;
 #1 Yen 0.71897 (gap 0.0193) — the fine-tune (§5) is the differentiator. RAW text canonical.
-Language map v1: ach 477 / nyn 401 / myx 267 / xog 84 / unk 271; next: re-cluster unk from
-SALT transcripts (v2) for wider forced coverage. Close 2026-08-03, 5 subs/day, one variable
-per submission.
+Language map v1: ach 477 / nyn 401 / myx 267 / xog 84 / unk 271. Text-LID rung CLOSED
+07-29: clusters-v3 (+77 forced) scored 0.698695 < 0.699656 — auto-detect was fine on the
+unk residue. All remaining upside = the §5 fine-tune (data/phase2_train built: 23,977
+train / 3,040 val across ach/nyn/xog/myx). Close 2026-08-03, 5 subs/day, one variable per
+submission.
 
 ### 0. Rent the GPU (Vast.ai)
 
