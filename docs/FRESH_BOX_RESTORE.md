@@ -20,14 +20,23 @@ On 80GB set `per_device_train_batch_size: 8, gradient_accumulation_steps: 2` in 
 
 ### 1. Environment (~10 min)
 
+Current box (2026-07-29): Azure `gyiga-finetuning-gpu-vm`, **H100 NVL 95GB** (sm_90, no
+Blackwell fix needed) — on ≥80GB VRAM set `per_device_train_batch_size: 8,
+gradient_accumulation_steps: 2` in the fine-tune config and `--batch-size 16` on decodes.
+
 ```bash
 git clone https://github.com/yigagilbert/waxal-zindi-challenge && cd waxal-zindi-challenge
 pip install uv 2>/dev/null || true
-uv pip install --system "datasets>=3.0,<4" soundfile librosa "transformers>=4.46" torch \
+# venv, NOT --system: system installs hit Permission denied on /usr/local (seen 07-29)
+uv venv ~/waxal-venv && source ~/waxal-venv/bin/activate
+echo 'source ~/waxal-venv/bin/activate' >> ~/.bashrc   # tmux windows inherit it
+uv pip install "datasets>=3.0,<4" soundfile librosa "transformers>=4.46" torch \
   huggingface_hub peft accelerate jiwer pyyaml
-huggingface-cli login   # token MUST have accepted: google/WaxalNLP,
-                        # Sunbird/asr-whisper-large-v3-salt, Sunbird/asr-whisper-51-african-languages
-nvidia-smi              # confirm GPU + VRAM; if sm_120 (5090/Blackwell) apply the torch fix below
+# `huggingface-cli` is a deprecated NO-OP on hub >=1.x — it prints a hint and does nothing.
+# Use `hf` everywhere. Token MUST have accepted: google/WaxalNLP,
+# Sunbird/asr-whisper-large-v3-salt, Sunbird/asr-whisper-51-african-languages.
+hf auth login
+nvidia-smi              # if sm_120 (5090/Blackwell) apply the torch fix below
 tmux new -s main        # window 0 = decode/submissions, window 1 = training (Ctrl-b c)
 ```
 (pyctcdecode/kenlm are Phase-1-only — skip unless doing champion work.)
@@ -37,7 +46,7 @@ tmux new -s main        # window 0 = decode/submissions, window 1 = training (Ct
 ```bash
 mkdir -p data/phase2 && cd data/phase2 \
   && curl -LO https://storage.googleapis.com/waxalphase2/audio.zip && unzip -q audio.zip && cd ../..
-huggingface-cli download yigagilbert/waxal-private-artifacts --repo-type dataset \
+hf download yigagilbert/waxal-private-artifacts --repo-type dataset \
   --include "phase2/*" --local-dir artifacts_phase2   # Test_phase2.csv, all 07-27/28 predictions, routing table
 cp artifacts_phase2/phase2/Test_phase2.csv data/phase2/
 mkdir -p outputs/analysis outputs/predictions
@@ -154,7 +163,7 @@ git clone https://github.com/yigagilbert/waxal-zindi-challenge && cd waxal-zindi
 pip install uv 2>/dev/null || true
 uv pip install --system "datasets>=3.0,<4" soundfile librosa "transformers>=4.46" torch \
   pyctcdecode kenlm huggingface_hub peft accelerate
-huggingface-cli login        # token with access to gated google/WaxalNLP + private repos
+hf auth login                # token with access to gated google/WaxalNLP + private repos (huggingface-cli is a no-op on hub >=1.x)
 nvidia-smi                   # confirm VRAM (24 vs 48 GB -> whisper batch 8 vs 16)
 export WAXAL_RAW_DIR=$PWD/google-waxal-asr-challenge20260630-10570-elxebu
 export HF_DATASETS_CACHE=/dev/shm/hf_datasets_cache && mkdir -p $HF_DATASETS_CACHE
