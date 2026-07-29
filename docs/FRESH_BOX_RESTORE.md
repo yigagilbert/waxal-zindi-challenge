@@ -2,10 +2,14 @@
 
 ## ⚡ Phase-2 new-VM playbook (definitive from 2026-07-28; Phase-1 restore below only for champion work)
 
-State: best **0.6835** (`phase2_af51_beam5_rawtext.csv` — keep SELECTED until beaten; RAW
-punctuation/casing is canonical, references contain punctuation). Rank 8; #1 eTHER 0.7177
-(gap 0.0342). Language map (transcript LID): ach 477 / nyn 401 / myx 267 / xog 84 / unk 271.
-Close 2026-08-03, 5 submissions/day, one variable per submission.
+State (07-29): best **0.699656** (`phase2_salt_forced_beam5.csv` — SALT engine, forced
+language via clusters v1, beam 5, raw — keep SELECTED until beaten). SALT beat af51 0.6835;
+the SALT+af51-unk splice scored LOWER (0.6967) → **af51 retired; SALT is base engine for
+everything** (splices use SALT as base). Board compressed: ranks 6–26 span 0.709→0.6997;
+#1 Yen 0.71897 (gap 0.0193) — the fine-tune (§5) is the differentiator. RAW text canonical.
+Language map v1: ach 477 / nyn 401 / myx 267 / xog 84 / unk 271; next: re-cluster unk from
+SALT transcripts (v2) for wider forced coverage. Close 2026-08-03, 5 subs/day, one variable
+per submission.
 
 ### 0. Rent the GPU (Vast.ai)
 
