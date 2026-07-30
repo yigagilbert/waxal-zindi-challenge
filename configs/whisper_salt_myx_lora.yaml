@@ -1,0 +1,57 @@
+run_name: whisper_salt_myx_lora
+# Lumasaba specialist (2026-07-30): the mixed-language adapter beat SALT base ONLY on myx
+# (bench combined 0.3236 -> 0.3143) — myx is the weakest, least-resourced language (20% of
+# the Phase-2 test). Hypothesis: a myx-only LoRA refines further where the mixed run split
+# its capacity 7 ways. Trains from SALT base (not stacked on the mixed adapter).
+# GATE: bench myx forced beam-5 must beat the mixed adapter's 0.3143 (raw combined) to ship.
+model:
+  name: Sunbird/asr-whisper-large-v3-salt
+data:
+  dataset_dir: data/phase2_train
+  languages: [myx]                        # 6,867 train clips; ~3.5 epochs over 1500 steps
+  max_eval_per_language: 200
+  lazy_preprocessing: true
+  language_tokens:
+    myx: 50349
+lora:
+  enabled: true
+  r: 32
+  lora_alpha: 64
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - fc1
+    - fc2
+  lora_dropout: 0.05
+  bias: none
+evaluation:
+  normalization: starter_lower
+tracking:
+  report_to: none
+  local_dir: outputs/experiments
+training_args:
+  output_dir: checkpoints/whisper_salt_myx_lora
+  per_device_train_batch_size: 8          # H100 sizing (bs2/ga8 on 24GB)
+  gradient_accumulation_steps: 2
+  per_device_eval_batch_size: 16
+  learning_rate: 1.0e-4                   # refinement pass: half the mixed run's LR
+  warmup_steps: 100
+  max_steps: 1500
+  gradient_checkpointing: true
+  bf16: true
+  fp16: false
+  eval_strategy: steps
+  save_strategy: steps
+  predict_with_generate: true
+  generation_max_length: 225
+  save_steps: 500
+  eval_steps: 500
+  logging_steps: 50
+  load_best_model_at_end: true
+  metric_for_best_model: eval_loss
+  greater_is_better: false
+  save_total_limit: 2
+  seed: 42
+  remove_unused_columns: false
