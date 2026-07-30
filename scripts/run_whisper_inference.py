@@ -55,6 +55,7 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--max-new-tokens", type=int, default=256)
     parser.add_argument("--num-beams", type=int, default=1)
+    parser.add_argument("--length-penalty", type=float, default=None, help="Beam-search length penalty (generate default when omitted).")
     parser.add_argument("--device", default=None)
     parser.add_argument(
         "--language-csv",
@@ -236,6 +237,8 @@ def main() -> None:
                 num_beams=args.num_beams,
                 max_new_tokens=args.max_new_tokens,
             )
+            if args.length_penalty is not None:
+                gen_kwargs["length_penalty"] = args.length_penalty
             prefix = extra_kwargs.get("prefix")
             if prefix is None:
                 gen_kwargs.update(extra_kwargs)
