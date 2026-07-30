@@ -13,7 +13,20 @@ everything** (splices use SALT as base). Board compressed: ranks 6–26 span 0.7
 #1 Yen 0.71897 (gap 0.0193) — the fine-tune (§5) is the differentiator. RAW text canonical.
 Language map v1: ach 477 / nyn 401 / myx 267 / xog 84 / unk 271. Text-LID rung CLOSED
 07-29: clusters-v3 (+77 forced) scored 0.698695 < 0.699656 — auto-detect was fine on the
-unk residue. FULL-FT GATE RESULT (07-31): configs/whisper_salt_phase2_fullft.yaml trained clean but the
+unk residue. CAMPAIGN CLOSED (07-31): ROVER ensemble (both variants) gated at ±0.0001 vs fielded — no
+ship; systems too correlated (one base model + weaker satellites) for voting to add signal.
+FINAL STATE: best public 0.699825 (`phase2_salt_myxadapter`); selections =
+{0.699825, 0.699754 lp08_composite} — diverse pair for the private reveal (public is a
+portion of the test set; ranks 6–35 span ~0.010). All artifacts durable on HF
+(yigagilbert/waxal-private-artifacts: predictions, submissions, analysis, LoRA adapter,
+fullft checkpoints partial). Box may be shut down; nothing pending needs GPU.
+Winning recipe for the record: SALT forced per-clip language (text-LID clusters v1,
+SALT slots ach=50357/nyn=50354/xog=50352/myx=50349) + beam 5 + raw text; myx rows from the
+mixed LoRA adapter; unk on auto-detect. Everything else (engines, full FT, LoRA, unk-LID,
+rule mining, decode sweep beyond lp0.8, ROVER) closed negative with evidence in §6b of
+FINAL_TOP3_STRATEGY.md and the git log.
+
+FULL-FT GATE RESULT (07-31): configs/whisper_salt_phase2_fullft.yaml trained clean but the
 forced gate failed on ALL four languages (macro 0.2798 vs fielded 0.2584; nyn +20.8%) —
 overfit/forgetting; eval_loss bottomed at step 4000 then rose. Eighth consecutive negative
 training result: SALT cannot be out-trained on this corpus. Pseudo-label/noisy-student
