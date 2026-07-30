@@ -2,8 +2,12 @@
 
 ## ⚡ Phase-2 new-VM playbook (definitive from 2026-07-28; Phase-1 restore below only for champion work)
 
-State (07-29): best **0.699656** (`phase2_salt_forced_beam5.csv` — SALT engine, forced
-language via clusters v1, beam 5, raw — keep SELECTED until beaten). SALT beat af51 0.6835;
+State (07-29 night): best **0.699825** (`phase2_salt_myxadapter.csv` — SALT forced + myx
+rows from the LoRA adapter — keep SELECTED until beaten; prior best 0.699656 pure SALT).
+Sunbird-51 token table (from its README; DIFFERENT slots than SALT): ach=50357, nyn=50322,
+xog=50310, myx=50329, lug=50332, teo=50315, lgg=50335, cgg=50350 (Rukiga separate from
+Runyankole). S51 forced decode = next rung; then per-cluster routing across
+{SALT, SALT+myx-adapter, S51}. SALT beat af51 0.6835;
 the SALT+af51-unk splice scored LOWER (0.6967) → **af51 retired; SALT is base engine for
 everything** (splices use SALT as base). Board compressed: ranks 6–26 span 0.709→0.6997;
 #1 Yen 0.71897 (gap 0.0193) — the fine-tune (§5) is the differentiator. RAW text canonical.
