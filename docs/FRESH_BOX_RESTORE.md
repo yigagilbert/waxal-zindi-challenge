@@ -13,7 +13,14 @@ everything** (splices use SALT as base). Board compressed: ranks 6–26 span 0.7
 #1 Yen 0.71897 (gap 0.0193) — the fine-tune (§5) is the differentiator. RAW text canonical.
 Language map v1: ach 477 / nyn 401 / myx 267 / xog 84 / unk 271. Text-LID rung CLOSED
 07-29: clusters-v3 (+77 forced) scored 0.698695 < 0.699656 — auto-detect was fine on the
-unk residue. §5 fine-tune GATE RESULT (07-29 night): LoRA trained clean (eval_loss 0.504→0.433) but the
+unk residue. FULL-FT GATE RESULT (07-31): configs/whisper_salt_phase2_fullft.yaml trained clean but the
+forced gate failed on ALL four languages (macro 0.2798 vs fielded 0.2584; nyn +20.8%) —
+overfit/forgetting; eval_loss bottomed at step 4000 then rose. Eighth consecutive negative
+training result: SALT cannot be out-trained on this corpus. Pseudo-label/noisy-student
+path withdrawn by corollary. Endgame = optional ROVER ensemble over existing decodes +
+final selections {0.699825 phase2_salt_myxadapter, 0.699754 phase2_lp08_composite}.
+
+§5 fine-tune GATE RESULT (07-29 night): LoRA trained clean (eval_loss 0.504→0.433) but the
 forced gate FAILED 3/4 languages (base already knows this corpus — no-new-information law);
 PASSED only myx (combined 0.3236→0.3143, WER 0.500→0.478). Action = myx-only adapter splice
 over the 0.699656 baseline (est. +0.002). Adapter at artifacts repo
