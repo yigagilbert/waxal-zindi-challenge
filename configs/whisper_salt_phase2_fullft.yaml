@@ -1,0 +1,57 @@
+run_name: whisper_salt_phase2_fullft
+# FULL fine-tune (2026-07-30) — the top-position bet. Rationale: leaders hit 0.72 with 3-5
+# submissions = a stronger base system, not tuning. Our LoRA (3% of weights, 1.6 epochs,
+# eval_loss still descending at stop) never tested full capacity. Warm-start from SALT,
+# full-parameter FT at low LR on the 7-language mix (trio kept for compliance + regularization).
+# GATE: forced beam-5 bench decode vs SALT base per language (raw); ship only on a clear win.
+# H100-NVL 95GB sizing; needs ~40GB disk for checkpoints (save_total_limit 2).
+model:
+  name: Sunbird/asr-whisper-large-v3-salt
+data:
+  dataset_dir: data/phase2_train
+  extra_dataset_dirs:
+    - data/processed
+  languages: null
+  max_train_per_language: 6000
+  max_eval_per_language: 200
+  lazy_preprocessing: true
+  language_tokens:
+    ach: 50357
+    nyn: 50354
+    xog: 50352
+    myx: 50349
+    lug: 50355
+    lin: 50325                            # NOT 50353 (= SALT's teo slot)
+    sna: 50324
+lora:
+  enabled: false                          # full fine-tune
+evaluation:
+  normalization: starter_lower
+tracking:
+  report_to: none
+  local_dir: outputs/experiments
+training_args:
+  output_dir: checkpoints/whisper_salt_phase2_fullft
+  per_device_train_batch_size: 8
+  gradient_accumulation_steps: 2          # effective 16
+  per_device_eval_batch_size: 16
+  learning_rate: 1.0e-5                   # full-FT territory; 20x below the LoRA run
+  warmup_steps: 300
+  max_steps: 6000                         # ~2.4 epochs over the ~39.5k mix
+  max_grad_norm: 1.0
+  gradient_checkpointing: true
+  bf16: true
+  fp16: false
+  eval_strategy: steps
+  save_strategy: steps
+  predict_with_generate: true
+  generation_max_length: 225
+  save_steps: 1000
+  eval_steps: 1000
+  logging_steps: 50
+  load_best_model_at_end: true
+  metric_for_best_model: eval_loss        # in-loop generate is unforced -> trend-only
+  greater_is_better: false
+  save_total_limit: 2
+  seed: 42
+  remove_unused_columns: false
