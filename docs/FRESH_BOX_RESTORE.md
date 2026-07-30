@@ -9,9 +9,13 @@ everything** (splices use SALT as base). Board compressed: ranks 6–26 span 0.7
 #1 Yen 0.71897 (gap 0.0193) — the fine-tune (§5) is the differentiator. RAW text canonical.
 Language map v1: ach 477 / nyn 401 / myx 267 / xog 84 / unk 271. Text-LID rung CLOSED
 07-29: clusters-v3 (+77 forced) scored 0.698695 < 0.699656 — auto-detect was fine on the
-unk residue. All remaining upside = the §5 fine-tune (data/phase2_train built: 23,977
-train / 3,040 val across ach/nyn/xog/myx). Close 2026-08-03, 5 subs/day, one variable per
-submission.
+unk residue. §5 fine-tune GATE RESULT (07-29 night): LoRA trained clean (eval_loss 0.504→0.433) but the
+forced gate FAILED 3/4 languages (base already knows this corpus — no-new-information law);
+PASSED only myx (combined 0.3236→0.3143, WER 0.500→0.478). Action = myx-only adapter splice
+over the 0.699656 baseline (est. +0.002). Adapter at artifacts repo
+`whisper_salt_phase2_lora/checkpoint-4000`. Continuation training closed. Remaining rungs:
+Sunbird-51 forced A/B, beam 8–10 / length_penalty on base SALT, native-speaker per-cluster
+review. Close 2026-08-03, 5 subs/day, one variable per submission.
 
 ### 0. Rent the GPU (Vast.ai)
 
