@@ -4,6 +4,45 @@ This project is being run as a competition solution for the Zindi Google WAXAL A
 
 Source checked: https://zindi.africa/competitions/google-waxal-asr-challenge on 2026-07-03.
 
+## Phase-2 endgame freeze — live pages rechecked 2026-07-30
+
+Both live challenge pages were read again before the final H100 runs:
+
+- Info: https://zindi.world/competitions/google-waxal-asr-challenge
+- Data: https://zindi.world/competitions/google-waxal-asr-challenge/data
+
+They still conflict. The Info page says only challenge-specified datasets may be
+used. The challenge-specific Data page says public open-source speech or language
+datasets may supplement the challenge data if they are publicly accessible,
+legally licensed, and disclosed.
+
+The remaining experiments use the strict intersection of those statements:
+
+- Direct training, language-ID, and language-model data: only
+  `google/WaxalNLP` train/validation and the Zindi-supplied challenge files.
+- Phase-2 audio: inference and signal/transcript-derived routing only. It is
+  never treated as labeled or pseudo-labeled ASR training data.
+- Pretrained ASR: only checkpoints openly available to everyone, as explicitly
+  permitted by the Info page. The current base is
+  `Sunbird/asr-whisper-large-v3-salt` at revision
+  `7448016c50bdec469b8454c9631c76fc1d1dd40e` (MIT; public, gated `auto`).
+  The transcript-only LID view uses
+  `huwenjie333/whisper-v3-ft-af51` at revision
+  `3648a5b3bec96a9d72c5f96f7d5aa94add2a4a1f` (MIT; public and ungated).
+- Packages: publicly available open-source packages only. No AutoML, paid API,
+  private service, or credit-card-gated tool.
+- Seeds, exact model revisions, commands, routing outputs, and final artifacts
+  must be retained for code review.
+
+Explicitly excluded from remaining runs even though the Data page appears to
+permit them: Wikipedia LM text, Common Voice, FLEURS, SALT training data,
+Makerere Radio, BibleTTS, private corpora, and any other external dataset.
+
+The live page gives a close/reveal date of 2026-08-02, a limit of five
+submissions per day, and requires two submissions to be selected. It
+inconsistently describes the public/private split as both 30/70 and 20/80, so
+the public leaderboard is treated as a weak selection sample.
+
 ## UNRESOLVED RULE CONFLICT (found 2026-07-09) — external data
 
 The Info/Rules tab and the Data tab directly contradict each other on external data:

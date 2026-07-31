@@ -45,6 +45,11 @@ def adapter_base_model(adapter_path: str) -> str | None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-name", default="openai/whisper-large-v3-turbo")
+    parser.add_argument(
+        "--model-revision",
+        default=None,
+        help="Optional immutable Hugging Face model revision/commit for reproducibility.",
+    )
     parser.add_argument("--adapter-path", default=None, help="Optional local PEFT/LoRA checkpoint or Hugging Face repo ID.")
     parser.add_argument("--merge-adapter", action="store_true", help="Merge PEFT adapter before inference.")
     parser.add_argument("--dataset-dir", type=Path, default=Path("data/processed"))
@@ -55,7 +60,23 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--max-new-tokens", type=int, default=256)
     parser.add_argument("--num-beams", type=int, default=1)
+    parser.add_argument(
+        "--num-return-sequences",
+        type=int,
+        default=1,
+        help="Return this many beam hypotheses per clip. Values >1 write a long-form n-best CSV.",
+    )
     parser.add_argument("--length-penalty", type=float, default=None, help="Beam-search length penalty (generate default when omitted).")
+    parser.add_argument("--do-sample", action="store_true", help="Use stochastic decoding instead of deterministic beam search.")
+    parser.add_argument("--temperature", type=float, default=None)
+    parser.add_argument("--top-p", type=float, default=None)
+    parser.add_argument("--top-k", type=int, default=None)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--preserve-generation-config",
+        action="store_true",
+        help="Keep the checkpoint's forced/suppressed token settings for a model-card-faithful A/B.",
+    )
     parser.add_argument("--device", default=None)
     parser.add_argument(
         "--language-csv",
@@ -77,6 +98,10 @@ def main() -> None:
         help="Force a single language code for every clip (overrides --language-csv).",
     )
     args = parser.parse_args()
+    if args.num_return_sequences < 1:
+        parser.error("--num-return-sequences must be at least 1")
+    if not args.do_sample and args.num_return_sequences > args.num_beams:
+        parser.error("--num-return-sequences cannot exceed --num-beams")
 
     try:
         import torch
@@ -84,6 +109,9 @@ def main() -> None:
         from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
     except ImportError as exc:
         raise RuntimeError("torch, peft, and transformers are required. Install with `uv sync` first.") from exc
+    torch.manual_seed(args.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(args.seed)
 
     ds = load_split(args.dataset_dir, args.split)
     if args.languages:
@@ -106,12 +134,19 @@ def main() -> None:
 
     processor_source = adapter_path or model_name
     try:
-        processor = AutoProcessor.from_pretrained(processor_source)
+        processor = AutoProcessor.from_pretrained(
+            processor_source,
+            revision=args.model_revision if adapter_path is None else None,
+        )
     except Exception:
-        processor = AutoProcessor.from_pretrained(model_name)
+        processor = AutoProcessor.from_pretrained(
+            model_name,
+            revision=args.model_revision,
+        )
 
     model = AutoModelForSpeechSeq2Seq.from_pretrained(
         model_name,
+        revision=args.model_revision,
         torch_dtype=torch_dtype,
         low_cpu_mem_usage=True,
     )
@@ -121,10 +156,11 @@ def main() -> None:
             model = model.merge_and_unload()
     model = model.to(device)
     model.eval()
-    if hasattr(model.config, "forced_decoder_ids"):
-        model.config.forced_decoder_ids = None
-    if hasattr(model.config, "suppress_tokens"):
-        model.config.suppress_tokens = []
+    if not args.preserve_generation_config:
+        if hasattr(model.config, "forced_decoder_ids"):
+            model.config.forced_decoder_ids = None
+        if hasattr(model.config, "suppress_tokens"):
+            model.config.suppress_tokens = []
 
     output = args.output
     if output is None:
@@ -193,7 +229,7 @@ def main() -> None:
     if len(groups) > 1 or next(iter(groups)) is not None:
         print("language groups:", {k or "auto": len(v) for k, v in sorted(groups.items(), key=lambda kv: kv[0] or "")})
 
-    preds_by_id: dict[str, str] = {}
+    preds_by_id: dict[str, list[dict[str, str | int | float]]] = {}
     done = 0
     for code, indices in groups.items():
         if code not in gen_kwargs_cache:
@@ -233,10 +269,19 @@ def main() -> None:
             gen_kwargs = dict(
                 input_features=input_features,
                 attention_mask=attention_mask,
-                do_sample=False,
+                do_sample=args.do_sample,
                 num_beams=args.num_beams,
+                num_return_sequences=args.num_return_sequences,
                 max_new_tokens=args.max_new_tokens,
             )
+            if args.temperature is not None:
+                gen_kwargs["temperature"] = args.temperature
+            if args.top_p is not None:
+                gen_kwargs["top_p"] = args.top_p
+            if args.top_k is not None:
+                gen_kwargs["top_k"] = args.top_k
+            if args.num_return_sequences > 1:
+                gen_kwargs.update(return_dict_in_generate=True, output_scores=True)
             if args.length_penalty is not None:
                 gen_kwargs["length_penalty"] = args.length_penalty
             prefix = extra_kwargs.get("prefix")
@@ -275,14 +320,69 @@ def main() -> None:
                         break
                     else:
                         raise last_exc
-            decoded = processor.batch_decode(generated, skip_special_tokens=True)
-            for example_id, pred in zip(batch["ID"], decoded, strict=True):
-                preds_by_id[example_id] = pred.strip()
+            sequences = generated.sequences if hasattr(generated, "sequences") else generated
+            decoded = processor.batch_decode(sequences, skip_special_tokens=True)
+            sequence_scores = getattr(generated, "sequences_scores", None)
+            if sequence_scores is None and hasattr(generated, "scores") and generated.scores:
+                beam_indices = getattr(generated, "beam_indices", None)
+                transition_scores = model.compute_transition_scores(
+                    sequences,
+                    generated.scores,
+                    beam_indices=beam_indices,
+                    normalize_logits=True,
+                )
+                # Forced/padded positions have a transition score of zero. Average
+                # only genuinely generated tokens so clips of different lengths
+                # remain comparable.
+                generated_mask = torch.isfinite(transition_scores) & (transition_scores < 0)
+                token_counts = generated_mask.sum(dim=1).clamp_min(1)
+                finite_scores = torch.where(
+                    generated_mask,
+                    transition_scores,
+                    torch.zeros_like(transition_scores),
+                )
+                average_scores = finite_scores.sum(dim=1) / token_counts
+                scores = [float(x) for x in average_scores.detach().cpu().tolist()]
+            elif sequence_scores is None:
+                scores = [0.0] * len(decoded)
+            else:
+                scores = [float(x) for x in sequence_scores.detach().cpu().tolist()]
+            expected = len(batch["ID"]) * args.num_return_sequences
+            if len(decoded) != expected:
+                raise RuntimeError(
+                    f"Expected {expected} decoded hypotheses, got {len(decoded)}"
+                )
+            for batch_index, example_id in enumerate(batch["ID"]):
+                candidates = []
+                offset = batch_index * args.num_return_sequences
+                for rank in range(args.num_return_sequences):
+                    pos = offset + rank
+                    candidates.append(
+                        {
+                            "rank": rank + 1,
+                            "Target": decoded[pos].strip(),
+                            "sequence_score": scores[pos],
+                            "language": code or "auto",
+                        }
+                    )
+                preds_by_id[example_id] = candidates
             done += len(batch["ID"])
             print(f"Predicted {done}/{len(ds)} [{code or 'auto'}]", flush=True)
 
-    rows = [{"ID": example_id, "Target": preds_by_id[example_id]} for example_id in all_ids]
-    write_csv_rows(output, rows, ["ID", "Target"])
+    if args.num_return_sequences == 1:
+        rows = [
+            {"ID": example_id, "Target": preds_by_id[example_id][0]["Target"]}
+            for example_id in all_ids
+        ]
+        fields = ["ID", "Target"]
+    else:
+        rows = [
+            {"ID": example_id, **candidate}
+            for example_id in all_ids
+            for candidate in preds_by_id[example_id]
+        ]
+        fields = ["ID", "rank", "Target", "sequence_score", "language"]
+    write_csv_rows(output, rows, fields)
     print(f"Wrote predictions to {output}")
 
 
