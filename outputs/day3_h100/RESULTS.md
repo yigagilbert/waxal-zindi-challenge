@@ -58,6 +58,41 @@ SHA-256 `bf3f30166566d0ab77d7d6e03f2b0837d99b232573e757b76adebd1b1c3f85d1`
 embedded newlines. Estimated public gain ≈ +0.001 (recovers ~28 deleted words
 on one row).
 
+## Test-weighted gating (methodology correction)
+
+Phase-2 test routing is ach 500 / nyn 500 / myx 499 / xog 1, but every earlier
+gate used a flat 4-language macro — giving xog 25% of the weight at 0.07% of the
+test, and myx 25% at 33%. `scripts/score_test_weighted.py` re-scores under the
+true mix. Re-checked candidates (test-weighted combined error):
+
+| candidate | ach | myx | nyn | xog | macro4 | TEST-W |
+|---|---:|---:|---:|---:|---:|---:|
+| anchor lp0.8 | 0.2253 | 0.2950 | 0.2098 | 0.2732 | 0.2508 | 0.2433 |
+| **t0075 (submitted)** | 0.2204 | 0.2858 | 0.2091 | 0.2723 | 0.2469 | **0.2385** |
+| loop+mbrmargin | 0.2209 | 0.2860 | 0.2096 | 0.2721 | 0.2471 | 0.2388 |
+| af51 | 0.2831 | 0.4368 | 0.3003 | 0.4017 | 0.3555 | 0.3400 |
+| adapter on myx | — | 0.3078 | — | — | — | — |
+
+No earlier decision flips: t0075 remains best and the mixed adapter still loses
+on the full myx slice. The correction's value is directional — **myx carries a
+0.077 error gap against nyn while occupying a third of the test**, so myx is the
+entire remaining opportunity.
+
+## Branches closed today
+
+| branch | evidence | decision |
+|---|---|---|
+| 220-token cap truncation | test outputs max 151 tokens vs a 220 cap; mean ref/hyp token ratio 1.019 | Not a defect; closed |
+| Cross-language token for myx | 200-clip probe: lug(50355) 0.5079, xog(50352) 0.5301 vs myx(50349) 0.3289 | myx token is correct; closed |
+| myx error concentration | worst 10% of myx clips carry 19.9% of myx error (uniform ≈ 10%) | Errors are broad-based, not catastrophic; catastrophe hunting exhausted |
+| Surface/format fixes | validation test-weighted deltas: force-capital +0.00005, strip `<skip>` +0.00003, strip final `.!?` +0.00167, strip all punctuation +0.00280, lowercase +0.01589 | All lose; raw output already matches reference conventions |
+| myx length penalty | full 849-clip myx gate: lp0.8 0.2950, lp0.7 0.2931, lp0.6 0.2931 | Real but small (−0.0019 myx ⇒ ≈ +0.0003 public); ship only inside a bundle |
+
+Notes on the surface tests: `<skip>` is a legitimate annotation token (28
+validation references contain it) and the model emits it correctly in 4 of 5
+cases; references start with a capital only 96.6% of the time versus 99.6% for
+our output, so forcing capitalization moves away from the target.
+
 ## Standing decisions
 
 - Submit `phase2_ngaow_repair_submission.csv`; on any non-regression it becomes
