@@ -88,10 +88,31 @@ entire remaining opportunity.
 | Surface/format fixes | validation test-weighted deltas: force-capital +0.00005, strip `<skip>` +0.00003, strip final `.!?` +0.00167, strip all punctuation +0.00280, lowercase +0.01589 | All lose; raw output already matches reference conventions |
 | myx length penalty | full 849-clip myx gate: lp0.8 0.2950, lp0.7 0.2931, lp0.6 0.2931 | Real but small (−0.0019 myx ⇒ ≈ +0.0003 public); ship only inside a bundle |
 
-Notes on the surface tests: `<skip>` is a legitimate annotation token (28
-validation references contain it) and the model emits it correctly in 4 of 5
-cases; references start with a capital only 96.6% of the time versus 99.6% for
-our output, so forcing capitalization moves away from the target.
+### Why the surface fixes fail: per-language annotator conventions
+
+Checked against the WaxalNLP **training** references (the source the conventions
+come from), not just validation:
+
+| language | train refs starting uppercase | train rows containing `<skip>` |
+|---|---:|---:|
+| ach | 99.07% | 0.02% |
+| nyn | 99.43% | 0.00% |
+| xog | 99.20% | 0.23% |
+| **myx** | **90.87%** | **2.20%** |
+
+`<skip>` is an official annotation token marking inaudible spans: 266
+occurrences in 184 train rows, 276 of the 293 tags in myx, appearing at start,
+middle and end of transcripts (e.g. `<skip> bafubuha bataru bali...`,
+`"<skip>" inzuki yaburukile ... "<skip>".`). The model emits it in 4 of 5
+validation cases where the reference also has it.
+
+Capitalization is informative, not noise: on the 8 validation rows where our
+hypothesis starts lowercase, the reference is also non-uppercase in 7 (88%), and
+forcing a capital on exactly those rows worsens them from 0.2375 to 0.2551.
+
+All 14 lowercase rows and all `<skip>` rows in the current test submission are
+myx. Both proposed fixes would therefore apply almost entirely to the weakest
+language, which is a third of the test — they are rejected.
 
 ## Standing decisions
 
