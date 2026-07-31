@@ -114,6 +114,49 @@ All 14 lowercase rows and all `<skip>` rows in the current test submission are
 myx. Both proposed fixes would therefore apply almost entirely to the weakest
 language, which is a third of the test — they are rejected.
 
+## Myx specialist LoRA — FAIL
+
+`configs/whisper_salt_myx_lora.yaml`, myx-only (6,867 clips), lr 1e-4, r32.
+`eval_loss` bottomed at step 750 (0.4786) then rose (0.4957 / 0.4969 / 0.5123) —
+overfitting after ~1.7 epochs. Gate on all 849 myx validation clips at lp0.6:
+base 0.2931 vs specialist-750 **0.3059** (+0.0128). Rejected. Ninth consecutive
+negative training result.
+
+## Removing the legacy myx adapter — the day's real gain
+
+The submitted candidate still carries old mixed-LoRA adapter text on 254 myx
+rows (retained on day 1 because it had been field-tested under the pre-fix
+routing). Validation disagrees, and the matched-subset test settles it: scoring
+only the myx clips that the *same* old lexical clustering would confidently
+label myx — i.e. the population the 254 rows were drawn from:
+
+| comparison | n | adapter | base lp0.6 | delta |
+|---|---:|---:|---:|---:|
+| matched subset (old-cluster myx) | 497 | 0.2978 | **0.2739** | **+0.0239** |
+| all myx | 849 | 0.3078 | **0.2931** | +0.0148 |
+
+The adapter is worse on exactly the clips where it is deployed, and by more than
+its average deficit. The old public A/B that appeared to favour it (+0.00017)
+ran under the broken routing at a different decode setting and is noise.
+
+Since public score = 1 − (WER+CER)/2 and our combined metric is (WER+CER)/2,
+254 rows × 0.0239 ÷ 1500 ≈ **+0.004**, plus ≈ +0.001 for the ID_NGAOW repair.
+
+Candidate: `phase2_bundle_ngaow_noadapter_lp06.csv`
+SHA-256 `813cd6924ad3eea6c98d55912b41b1b8afd10a569a2e61ea0b9f0de298d1d482`
+254 rows differ from the 0.715392 submission (253 myx adapter rows replaced with
+plain SALT lp0.6, 1 nyn = ID_NGAOW). 1,500 rows, unique IDs, exact order, no
+empty targets, no embedded newlines, zero repetition loops.
+
+## Length penalty — measured, then dropped
+
+Full per-language validation sweeps: myx lp1.0 0.3036 / lp0.8 0.2950 / lp0.7
+0.2931 / lp0.6 0.2931; ach lp0.8 0.2253 → lp0.6 0.2248; nyn lp0.8 0.2098 →
+lp0.6 0.2099. lp0.6 is the myx/ach optimum, but applying it *on top of* the
+protected loop+MBR candidate gains nothing (+0.00012) — its benefit overlaps
+rows those operations already repaired. It is therefore used only as the
+replacement text for the de-adaptered myx rows, not as a global change.
+
 ## Standing decisions
 
 - Submit `phase2_ngaow_repair_submission.csv`; on any non-regression it becomes
