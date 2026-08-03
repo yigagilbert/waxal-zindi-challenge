@@ -34,9 +34,18 @@ Two submissions differing *only* by restored casing returned byte-identical WER
 | champion + casing | 0.8814 | 0.727527 | +0.0035 | +0.0034 |
 | champion, alpha 1.1/1.0 | 0.8727 | 0.689930 | -0.0087 | -0.0376 |
 
-The bench has been **directionally correct every time**, exact for formatting
-changes, and conservative in magnitude for decode changes (the alpha regression
-appeared ~4x larger on the leaderboard). The bench-to-public offset (~0.154) is
+**Bench reliability depends on the class of change** (this is the operative rule):
+
+| change class | bench transfers? | evidence |
+|---|---|---|
+| text / formatting | **yes, precisely** | casing +0.0035 predicted, +0.0034 actual |
+| decode parameters | direction yes, magnitude no | alpha -0.0087 predicted, -0.0376 actual |
+| **acoustic model** | **no** | robust +0.0019 predicted, **-0.0013 actual** |
+
+The bench is in-domain (same speakers as training), so a model that generalizes
+better to *unseen* speakers cannot be detected there. Only submit acoustic
+changes with independent justification; treat bench PASS as authoritative only
+for text-level changes. The bench-to-public offset (~0.154) is
 acoustic domain shift: Phase 2 is new speakers and recordings by design.
 
 Bench: 800 held-out WAXAL validation clips, 400 lin + 400 sna
@@ -49,7 +58,7 @@ Bench: 800 held-out WAXAL validation clips, 400 lin + 400 sna
 | 1 | `SUBMISSION_champion_v2.csv` | 0.724149 | 0.413865 | 0.137837 | baseline re-established |
 | 2 | `SUBMISSION_champion_v2_cased.csv` | **0.727527** | 0.413865 | 0.131082 | **best** (+0.003378) |
 | 3 | `SUBMISSION_alphaup_cased.csv` | 0.689930 | 0.463677 | 0.156462 | rejected (-0.037597) |
-| 4 | `SUBMISSION_robust_v2_cased.csv` | pending | — | — | gate PASS (bench +0.0019) |
+| 4 | `SUBMISSION_robust_v2_cased.csv` | 0.726259 | 0.414163 | 0.133319 | bench PASS but public **-0.001268** |
 
 ## Pipeline that produced the current best
 
@@ -73,6 +82,10 @@ Bench: 800 held-out WAXAL validation clips, 400 lin + 400 sna
 | Forcing a trailing period | loses under both WER-normalization hypotheses; ours ends .!? 94.0% vs refs 95.0% (sna) | Rejected |
 | Repetition-loop repair | 4/800 bench rows flagged, fallback better on 0; the 13 test flags are genuine repeated phrases that af51 reproduces | Closed — CTC does not loop like seq2seq |
 | o6 Lingala LM | MD5-identical to `lm_phase2/lin_5gram.binary` | Already in use |
+| Robustness continuation | bench 0.8833 (PASS) but public 0.726259 (-0.0013) | Rejected; established that bench cannot gate acoustic changes |
+| Lexicon-constrained spelling repair | hypothesis OOV 0.77% vs reference 0.98%; only 2.6% of near-misses are OOV-vs-in-lexicon | Closed — beam+LM already constrains to the lexicon |
+| Audio preprocessing / channel match | test vs validation: RMS 0.059/0.068, centroid 1762/1629 Hz, silence 31%/33% | Closed — no channel mismatch to correct |
+| Word-bonus (beta) tuning | hyp/ref word ratio 0.976 lin / 0.985 sna; 81-91% of errors are substitutions, not del/ins | Closed — length is already correct |
 
 ## Open work
 
@@ -95,5 +108,20 @@ Bench: 800 held-out WAXAL validation clips, 400 lin + 400 sna
   Test candidate: `SUBMISSION_robust_v2_cased.csv`
   (sha256 `85837f8d357175fe9c34bf803bf9dabcaa067f2e2211dfd42e9ffd516d19c035`),
   485 of 892 rows differ from the current best.
-- Lingala is the weak language (bench WER 0.1989 vs sna 0.1026) and is 448/892
-  of the test set; any further work should target it.
+## Error profile — where the remaining loss actually is
+
+WER 0.4139 against CER 0.1311 is a 3.1x ratio. On the bench, **46.9% of
+substituted words are within 1-2 characters of the reference**: spelling and
+morphological variants (e.g. `vemutambo`/`vomutambo`), not mishearings. Errors
+are 81-91% substitutions with correct word counts, and the lexicon is already
+respected. Remaining word-choice errors are therefore arbitrated by the language
+model, not the acoustic model or the decoder's length control.
+
+- **CTC logit ensemble** (champion + robust-3000, log-prob averaging; required
+  adding `--ensemble-checkpoints` to the pipeline): bench 0.8832 (+0.0018, PASS)
+  but its gain derives from the robust model, whose bench gain did not transfer.
+  Held as a diversity candidate rather than an expected gain.
+- **Lingala is the weak language** (bench WER 0.1916-0.1989 vs sna 0.1023) and is
+  448/892 of the test set. Its LM already includes Wikipedia-Lingala (36,510
+  lines of 88,380 total); Shona's LM has no Wikipedia component. Expanding the
+  language-model text is the one lever aimed squarely at word-choice errors.
