@@ -49,6 +49,7 @@ Bench: 800 held-out WAXAL validation clips, 400 lin + 400 sna
 | 1 | `SUBMISSION_champion_v2.csv` | 0.724149 | 0.413865 | 0.137837 | baseline re-established |
 | 2 | `SUBMISSION_champion_v2_cased.csv` | **0.727527** | 0.413865 | 0.131082 | **best** (+0.003378) |
 | 3 | `SUBMISSION_alphaup_cased.csv` | 0.689930 | 0.463677 | 0.156462 | rejected (-0.037597) |
+| 4 | `SUBMISSION_robust_v2_cased.csv` | pending | — | — | gate PASS (bench +0.0019) |
 
 ## Pipeline that produced the current best
 
@@ -75,11 +76,24 @@ Bench: 800 held-out WAXAL validation clips, 400 lin + 400 sna
 
 ## Open work
 
-- **Robustness continuation** (`configs/xlsr_champion_robust_continue.yaml`):
-  champion continued on its own in-domain lin/sna audio with much stronger
-  SpecAugment (time mask 0.05->0.10, channel masking on) plus dropout/layerdrop,
-  LR 1e-5, 3000 steps. Targets the 0.154 domain-shift gap — the only remaining
-  lever that does. Required exposing `model.regularization` in
-  `scripts/train_xlsr_ctc.py`. **GATE: must beat bench 0.8814.**
+- **Robustness continuation — GATE PASSED** (`configs/xlsr_champion_robust_continue.yaml`):
+  champion continued on its own in-domain lin/sna audio with stronger SpecAugment
+  (time mask 0.05->0.10, channel masking on) plus dropout/layerdrop, LR 1e-5,
+  3000 steps; required exposing `model.regularization` in `train_xlsr_ctc.py`.
+
+  | | baseline | robust-3000 |
+  |---|---:|---:|
+  | lin WER | 0.1989 | **0.1916** |
+  | lin CER | 0.1284 | 0.1292 |
+  | sna WER | 0.1026 | **0.1023** |
+  | sna CER | 0.0435 | **0.0430** |
+  | bench score | 0.8814 | **0.8833** (+0.0019) |
+
+  The gain is concentrated in Lingala WER — the weak language and 448/892 of the
+  test set. In-loop `eval_cer` (~0.2594) is inflated by the trainer's known
+  space-stripping quirk and is trend-only; the bench decode is the honest gate.
+  Test candidate: `SUBMISSION_robust_v2_cased.csv`
+  (sha256 `85837f8d357175fe9c34bf803bf9dabcaa067f2e2211dfd42e9ffd516d19c035`),
+  485 of 892 rows differ from the current best.
 - Lingala is the weak language (bench WER 0.1989 vs sna 0.1026) and is 448/892
   of the test set; any further work should target it.
