@@ -226,3 +226,40 @@ Rules note: the unlabeled split is part of the challenge-specified WaxalNLP
 dataset (not external data). Pseudo-labeling uses only our own model's outputs
 on that official data; Phase-2 *test* audio remains inference-only. Disclosed
 in `docs/RULES_AND_DATA_USE.md`.
+
+## Submission ledger correction and beam closure — 2026-08-04
+
+`eCRxcvG1` returned **0.728575887** — identical to nine decimals with
+`vipX9aTt` from ~22 h earlier. The beam-2400 file had already been submitted by
+the previous session (that was the unexplained ledger entry); today's upload was
+a duplicate. Two process rules adopted:
+
+1. **Submission ledger**: every submitted file's SHA-256 and public score are
+   recorded here at submission time; check the ledger before uploading.
+2. **Minimum-effect rule**: decode-class candidates require a bench delta of at
+   least +0.002 before spending a submission. Beam 2400's +0.000475 bench gain
+   came back as **-0.00017 public** — sub-millipoint decode gains are inside
+   public-split noise.
+
+| file | sha256 (prefix) | public |
+|---|---|---:|
+| SUBMISSION_champion_v2.csv | — | 0.724149 |
+| SUBMISSION_champion_v2_cased.csv | 5e934535 | 0.727527 |
+| SUBMISSION_alphaup_cased.csv | d374969c | 0.689930 |
+| SUBMISSION_robust_v2_cased.csv | 85837f8d | 0.726259 |
+| SUBMISSION_champion_v2_beam1200_cased.csv | — | **0.728747 (best)** |
+| SUBMISSION_champion_v2_beam2400_cased.csv | 485add22 | 0.728576 (x2: vipX9aTt, eCRxcvG1) |
+
+**Beam-width branch closed**: 400 -> 1200 gained +0.0012 public; 1200 -> 2400
+lost -0.00017 public despite a positive bench delta. Optimum stands at 1200.
+
+## Noisy-student chain — armed 2026-08-04
+
+`sslchain` tmux session: waits for download+decode -> runs
+`filter_pseudo_labels.py` (disagreement <= 0.10, rate/word sanity) -> attaches
+kept rows as a `pseudo` split inside `data/processed/hf_dataset` -> if kept >=
+10,000, launches `configs/xlsr_champion_ssl_continue.yaml` (champion
+continuation, SpecAugment student, LR 2e-5, 6,000 steps) automatically.
+Promotion requires BOTH gates: AfriVoices OOD improvement over combined 0.20779
+AND no material bench regression. Stale tmux sessions from the previous
+operator (1B, beam shards, OOD setup) were cleaned.
