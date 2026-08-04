@@ -1,0 +1,48 @@
+run_name: xlsr_1b_linsna_raw_smoke
+model:
+  name: facebook/wav2vec2-xls-r-1b
+  processor_name: champion_repo/checkpoint-24000
+  # The tokenizer object includes added BOS/EOS tokens at IDs 110/111, but the
+  # champion's actual CTC lm_head/config has 110 output logits (IDs 0..109).
+  vocab_size: 110
+  freeze_feature_encoder: true
+  regularization:
+    hidden_dropout: 0.10
+    activation_dropout: 0.05
+    layerdrop: 0.05
+    mask_time_prob: 0.075
+    mask_feature_prob: 0.05
+data:
+  # Corrected Phase 2 is Lingala + Shona. Train on the untouched official
+  # waveforms first; previous trimmed-audio runs regressed from train/test
+  # mismatch. No external data enters this smoke run.
+  dataset_dir: data/processed
+  languages: [lin, sna]
+  min_duration: 0.30
+  max_duration: 50.0
+  language_balanced_sampling: false
+  lazy_preprocessing: true
+text:
+  normalization: language_safe
+evaluation:
+  normalization: language_safe
+tracking:
+  report_to: none
+  local_dir: outputs/experiments
+training_args:
+  output_dir: /mnt/serving_eval/waxal/xlsr_1b_linsna_raw_smoke
+  per_device_train_batch_size: 2
+  per_device_eval_batch_size: 2
+  gradient_accumulation_steps: 8
+  learning_rate: 1.0e-4
+  warmup_steps: 100
+  max_steps: 500
+  bf16: true
+  gradient_checkpointing: true
+  eval_strategy: steps
+  save_strategy: "no"
+  eval_steps: 250
+  logging_steps: 25
+  seed: 42
+  load_best_model_at_end: false
+  dataloader_num_workers: 4

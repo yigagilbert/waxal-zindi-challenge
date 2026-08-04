@@ -291,7 +291,20 @@ def main() -> None:
     output_dir = ensure_dir(config["training_args"]["output_dir"])
     normalization = config.get("text", {}).get("normalization", "language_safe")
 
-    if bool(config.get("model", {}).get("load_processor_from_checkpoint", False)):
+    processor_name = config.get("model", {}).get("processor_name")
+    if processor_name:
+        # A larger acoustic encoder can still reuse the champion's exact CTC
+        # token-to-id mapping. This keeps independently trained models
+        # logit-ensemble compatible without pretending their weights share a
+        # checkpoint lineage.
+        processor = Wav2Vec2Processor.from_pretrained(processor_name)
+        tokenizer = processor.tokenizer
+        feature_extractor = processor.feature_extractor
+        print(
+            f"Loaded explicit processor/vocab from {processor_name}: "
+            f"{len(tokenizer)} tokens (ensemble-compatible CTC head)"
+        )
+    elif bool(config.get("model", {}).get("load_processor_from_checkpoint", False)):
         # CONTINUATION: reuse the checkpoint's EXACT tokenizer/vocab so the CTC head
         # (lm_head) matches and is NOT reinitialized. Rebuilding a vocab from the data
         # yields a different token<->id map and silently discards the trained output layer.
@@ -345,13 +358,27 @@ def main() -> None:
         train_data = train_ds.map(prepare_example, remove_columns=train_remove_columns)
         eval_data = eval_ds.map(prepare_example, remove_columns=eval_remove_columns)
 
+    regularization = config.get("model", {}).get("regularization", {}) or {}
+    if regularization:
+        print(f"Regularization overrides: {regularization}")
+    # ``len(tokenizer)`` includes added metadata-only BOS/EOS tokens for the
+    # recovered champion processor (112), while its actual CTC projection has
+    # 110 logits. Allow the acoustic-head size to be pinned independently so a
+    # new encoder remains logit-ensemble compatible with that checkpoint.
+    ctc_vocab_size = int(config.get("model", {}).get("vocab_size", len(processor.tokenizer)))
+    if ctc_vocab_size > len(processor.tokenizer):
+        raise ValueError(
+            f"model.vocab_size={ctc_vocab_size} exceeds tokenizer size {len(processor.tokenizer)}"
+        )
+    print(f"CTC head size: {ctc_vocab_size} logits (tokenizer object has {len(processor.tokenizer)} tokens)")
     model = AutoModelForCTC.from_pretrained(
         model_name,
         ctc_loss_reduction="mean",
         ctc_zero_infinity=True,
         ignore_mismatched_sizes=True,
         pad_token_id=processor.tokenizer.pad_token_id,
-        vocab_size=len(processor.tokenizer),
+        vocab_size=ctc_vocab_size,
+        **regularization,
     )
     if config.get("model", {}).get("freeze_feature_encoder", True):
         model.freeze_feature_encoder()

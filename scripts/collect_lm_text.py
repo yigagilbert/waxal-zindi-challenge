@@ -67,6 +67,11 @@ HF_SOURCES = [
     # on the bottleneck language. Articles are sentence-split before normalization.
     {"dataset": "wikimedia/wikipedia", "config": "20231101.ln", "splits": ["train"],
      "language": "lin", "license": "CC-BY-SA-4.0 (Wikipedia)", "split_sentences": True},
+    # Shona was the only corrected Phase-2 language without Wikipedia text in
+    # the fielded LM. Keep it as a separate candidate so the existing champion
+    # corpus and binary remain immutable for A/B and rollback.
+    {"dataset": "wikimedia/wikipedia", "config": "20231101.sn", "splits": ["train"],
+     "language": "sna", "license": "CC-BY-SA-4.0 (Wikipedia)", "split_sentences": True},
 ]
 
 DEFAULT_SPLITS = ["train", "validation", "test"]

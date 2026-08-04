@@ -13,6 +13,7 @@ Never reads the language column or ID prefixes for routing. Flow:
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sys
 from collections import Counter, defaultdict
@@ -41,7 +42,33 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--vocab-path", type=Path, default=None)
     parser.add_argument("--dataset-dir", type=Path, required=True)
     parser.add_argument("--split", default="validation")
+    parser.add_argument(
+        "--ids-csv",
+        type=Path,
+        default=None,
+        help="Optional ID-only manifest used to restrict the split for an evaluation gate. "
+        "No manifest columns are exposed to routing.",
+    )
+    parser.add_argument(
+        "--num-shards",
+        type=int,
+        default=1,
+        help="Split the selected dataset into contiguous decode shards.",
+    )
+    parser.add_argument(
+        "--shard-index",
+        type=int,
+        default=0,
+        help="Zero-based shard index used with --num-shards.",
+    )
     parser.add_argument("--kenlm-dir", type=Path, default=Path("data/lm"))
+    parser.add_argument(
+        "--ensemble-checkpoints",
+        nargs="*",
+        default=None,
+        help="Extra same-vocabulary CTC checkpoints whose log-probabilities are "
+        "averaged with --checkpoint before decoding.",
+    )
     parser.add_argument("--order", type=int, default=5)
     parser.add_argument("--languages", nargs="*", default=["lin", "lug", "sna"])
     parser.add_argument("--default-language", default="lin")
@@ -56,8 +83,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--greedy-languages",
         nargs="*",
-        default=["sna"],
-        help="Languages to decode greedily instead of beam+LM (sna: KenLM hurts per the sweep).",
+        default=[],
+        help="Languages to decode greedily instead of beam+LM; default is none.",
     )
     parser.add_argument("--beam-width", type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=4)
@@ -88,8 +115,39 @@ def main() -> None:
     word_delimiter = processor.tokenizer.word_delimiter_token
     model = AutoModelForCTC.from_pretrained(args.checkpoint).to(device)
     model.eval()
+    ensemble_models = []
+    for extra_path in args.ensemble_checkpoints or []:
+        extra_model = AutoModelForCTC.from_pretrained(extra_path).to(device)
+        extra_model.eval()
+        ensemble_models.append(extra_model)
+        print(f"Ensembling with {extra_path}")
 
     ds = load_split(args.dataset_dir, args.split)
+    selected_ids = None
+    if args.ids_csv is not None:
+        with args.ids_csv.open(newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        if not rows or "ID" not in rows[0]:
+            raise ValueError(f"{args.ids_csv} must contain a non-empty ID column")
+        manifest_ids = [row["ID"] for row in rows]
+        if len(manifest_ids) != len(set(manifest_ids)):
+            raise ValueError(f"{args.ids_csv} contains duplicate IDs")
+        selected_ids = set(manifest_ids)
+        ds = ds.filter(lambda row: row["ID"] in selected_ids)
+        found_ids = set(ds["ID"])
+        missing = selected_ids - found_ids
+        if missing:
+            preview = ", ".join(sorted(missing)[:10])
+            raise ValueError(f"{len(missing)} IDs from {args.ids_csv} are absent from the split: {preview}")
+        print(f"Restricted {args.split} to {len(ds)} IDs from {args.ids_csv}")
+    if args.num_shards < 1:
+        raise ValueError("--num-shards must be at least 1")
+    if not 0 <= args.shard_index < args.num_shards:
+        raise ValueError("--shard-index must satisfy 0 <= index < num_shards")
+    if args.num_shards > 1:
+        before = len(ds)
+        ds = ds.shard(num_shards=args.num_shards, index=args.shard_index, contiguous=True)
+        print(f"Decode shard {args.shard_index + 1}/{args.num_shards}: {len(ds)}/{before} examples")
     if args.max_samples is not None:
         ds = ds.select(range(min(len(ds), args.max_samples)))
     has_references = "transcription" in ds.column_names
@@ -106,7 +164,11 @@ def main() -> None:
         inputs = processor(audios, sampling_rate=16_000, return_tensors="pt", padding=True, return_attention_mask=True)
         inputs = {key: value.to(device) for key, value in inputs.items()}
         with torch.no_grad():
-            logits = model(**inputs).logits
+            logits = torch.log_softmax(model(**inputs).logits, dim=-1)
+            for extra_model in ensemble_models:
+                logits += torch.log_softmax(extra_model(**inputs).logits, dim=-1)
+            if ensemble_models:
+                logits /= 1 + len(ensemble_models)
         output_lengths = model._get_feat_extract_output_lengths(inputs["attention_mask"].sum(-1))
         for row_idx in range(logits.shape[0]):
             length = int(output_lengths[row_idx])
@@ -134,6 +196,15 @@ def main() -> None:
             best = args.default_language
             lid_defaulted += 1
         predicted_language.append(best)
+
+    # The remaining work is CPU-only KenLM decoding. Release the acoustic
+    # models before a potentially long, wide-beam search so independent shards
+    # can run in parallel without pinning one model copy per shard on the GPU.
+    del model
+    ensemble_models.clear()
+    if str(device).startswith("cuda"):
+        torch.cuda.empty_cache()
+        print("Released acoustic model GPU memory before CPU beam decoding", flush=True)
 
     # ---- per-language beam+LM decode of the cached logits ----
     params = {}
@@ -176,8 +247,18 @@ def main() -> None:
     report = {
         "checkpoint": str(args.checkpoint),
         "split": args.split,
+        "ids_csv": str(args.ids_csv) if args.ids_csv else None,
+        "shard": {"index": args.shard_index, "count": args.num_shards},
         "num_examples": len(ids),
         "normalization": args.normalization,
+        "decoder": {
+            "kenlm_dir": str(args.kenlm_dir),
+            "order": args.order,
+            "languages": list(args.languages),
+            "default_language": args.default_language,
+            "greedy_languages": sorted(greedy_languages),
+            "beam_width": args.beam_width,
+        },
         "decode_params": {language: params.get(language, {"alpha": args.alpha, "beta": args.beta}) for language in args.languages},
         "lid": {
             "defaulted_empty_transcript": lid_defaulted,

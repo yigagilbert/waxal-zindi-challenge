@@ -1,15 +1,22 @@
 #!/usr/bin/env bash
-# End-to-end Phase-2 (corrected test set) pipeline, run as one unattended job.
+# RETIRED: this is the withdrawn-test Whisper pipeline, despite its old filename.
 #
-# Reproduces the full champion chain on data/processed_phase2_v2:
+# It reproduces the old Acholi/Nyankore/Soga/Masaaba chain:
 #   af51 auto decode -> text LID -> acoustic LID -> LID fusion
 #   -> SALT forced decode (lp0.6) -> long-clip repair (>30s) -> loop repair
 #   -> 8-sample stochastic decode -> MBR margin gate (frozen 0.075)
-#   -> submission
+#
+# The corrected test is Lingala/Shona and the current champion is XLS-R CTC plus
+# per-language KenLM decoding. Keeping the historical body below is useful for
+# provenance, but executing it would spend GPU time on the wrong model/languages.
 #
 # Every stage writes to outputs/day4_h100 and is skipped if its output exists,
 # so the script is resumable. Stop on first error.
 set -euo pipefail
+echo "ERROR: retired withdrawn-test pipeline (ach/nyn/xog/myx Whisper stack)." >&2
+echo "Use the corrected Lingala/Shona XLS-R CTC pipeline recorded in outputs/day4_h100/RESULTS.md." >&2
+exit 2
+
 cd "$(dirname "$0")/.."
 source ~/waxal-venv/bin/activate
 

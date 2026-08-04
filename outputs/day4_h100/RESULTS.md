@@ -263,3 +263,43 @@ continuation, SpecAugment student, LR 2e-5, 6,000 steps) automatically.
 Promotion requires BOTH gates: AfriVoices OOD improvement over combined 0.20779
 AND no material bench regression. Stale tmux sessions from the previous
 operator (1B, beam shards, OOD setup) were cleaned.
+
+## Noisy-student semi-supervised branch — CLOSED 2026-08-04
+
+Executed in full: 24,000 unlabeled WaxalNLP lin/sna clips streamed to FLAC,
+pseudo-labeled by the champion (greedy + beam+LM), confidence-filtered by
+greedy/beam disagreement <=0.10 (21,208 kept, 88%), student trained from
+checkpoint-24000 on labeled+pseudo (51.5k clips, language-balanced) with the
+SpecAugment robustness recipe, LR 2e-5, best at step 4000 by eval_cer.
+
+Dual gate, identical tooling, fresh baselines:
+
+| measurement | champion | student | verdict |
+|---|---:|---:|---|
+| AfriVoices OOD greedy (600 clips, 151 unseen speakers) | 0.2046 | **0.2010** | acoustic model genuinely improved |
+| AfriVoices OOD routed (beam+LM, as deployed) | **0.0909** | 0.0929 | deployed system worse |
+| 800-row bench, beam 1200 | **0.882157** | 0.879649 | -0.0025, breaches the -0.002 line |
+
+**Key finding:** the new-speaker pseudo-data improved the raw acoustic model on
+unseen speakers (greedy -1.8% rel), but the gain does not survive beam+LM
+decoding — the LM already corrects the error class the student learned to
+avoid, and the student's new errors are less LM-recoverable. Acoustic and LM
+contributions overlap rather than compose.
+
+Teacher+student logit ensemble (frame-level log-prob averaging): OOD routed
+0.1018 vs 0.0909 — WORSE; ensemble greedy collapsed to 0.5989 because the
+student's CTC alignments drifted (masking-heavy continuation), so frame-wise
+averaging smears both models' peaky distributions. CTC frame ensembling only
+works between alignment-compatible checkpoints.
+
+Zero submissions spent on this branch. Student checkpoint-4000 archived at
+`yigagilbert/waxal-phase2-checkpoints/xlsr_champion_ssl/checkpoint-4000`.
+
+## Campaign state after closure
+
+Deployed ceiling: champion + beam 1200 + casing = public **0.728747**.
+Every branch is closed with direct evidence (engines, ensembles x3, formatting,
+LM weight/text, loop/lexicon repair, beta, channel, robust continuation, 1B
+scale, noisy-student). Remaining value is selection discipline for the private
+70-80% reveal: pick two submissions that are strong AND diverse (max-of-two
+under reshuffle), keep the record reproducible for top-10 code review.

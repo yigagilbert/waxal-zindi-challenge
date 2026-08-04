@@ -73,16 +73,27 @@ def attach_batch(
         "language": [],
         "original_split": [],
         "duration": [],
+        # Preserve audit-only metadata from the official WAXAL rows. These
+        # fields must never be used for Phase 2 routing, but dropping them made
+        # it impossible to measure speaker leakage in the validation gate.
+        "speaker_id": [],
+        "gender": [],
     }
     if include_labels:
         out["transcription"] = []
 
-    for example_id, audio in zip(batch["id"], batch["audio"], strict=True):
+    speaker_ids = batch.get("speaker_id", [None] * len(batch["id"]))
+    genders = batch.get("gender", [None] * len(batch["id"]))
+    for example_id, audio, speaker_id, gender in zip(
+        batch["id"], batch["audio"], speaker_ids, genders, strict=True
+    ):
         csv_row = csv_by_id[example_id]
         lang = csv_row.get("language") or id_language(example_id)
         out["ID"].append(example_id)
         out["language"].append(lang)
         out["original_split"].append(csv_row.get("original_split", split_name))
+        out["speaker_id"].append(speaker_id)
+        out["gender"].append(gender)
         if skip_duration:
             out["duration"].append(None)
         else:
@@ -121,6 +132,8 @@ def collect_streaming_dataset(
             "audio": example["audio"],
             "language": csv_row.get("language") or id_language(example_id),
             "original_split": csv_row.get("original_split", split_name),
+            "speaker_id": example.get("speaker_id"),
+            "gender": example.get("gender"),
         }
         if include_labels:
             record["transcription"] = csv_row["transcription"]

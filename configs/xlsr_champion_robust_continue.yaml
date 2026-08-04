@@ -1,0 +1,52 @@
+run_name: xlsr_champion_robust_continue
+# Corrected Phase-2 robustness continuation reconstructed from the live H100
+# experiment on 2026-08-03. This branch passed the in-domain bench (+0.0019)
+# but regressed on the public leaderboard (-0.0013); retain for provenance and
+# ensemble diversity, not as the current champion.
+model:
+  name: champion_repo/checkpoint-24000
+  load_processor_from_checkpoint: true
+  freeze_feature_encoder: true
+  regularization:
+    mask_time_prob: 0.10
+    mask_time_length: 10
+    mask_feature_prob: 0.10
+    mask_feature_length: 64
+    hidden_dropout: 0.05
+    activation_dropout: 0.05
+    attention_dropout: 0.05
+    layerdrop: 0.05
+data:
+  dataset_dir: data/processed
+  languages: [lin, sna]
+  min_duration: 0.30
+  max_duration: 50.0
+  language_balanced_sampling: true
+  lazy_preprocessing: true
+text:
+  normalization: language_safe
+evaluation:
+  normalization: language_safe
+tracking:
+  report_to: none
+  local_dir: outputs/experiments
+training_args:
+  output_dir: checkpoints/xlsr_champion_robust
+  per_device_train_batch_size: 8
+  per_device_eval_batch_size: 8
+  gradient_accumulation_steps: 2
+  learning_rate: 1.0e-5
+  warmup_steps: 200
+  max_steps: 3000
+  fp16: true
+  gradient_checkpointing: true
+  eval_strategy: steps
+  save_strategy: steps
+  save_steps: 500
+  eval_steps: 500
+  logging_steps: 50
+  save_total_limit: 3
+  seed: 42
+  load_best_model_at_end: true
+  metric_for_best_model: eval_cer
+  greater_is_better: false

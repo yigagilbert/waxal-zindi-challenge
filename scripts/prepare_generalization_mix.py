@@ -90,13 +90,31 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Required together with --include-lingala-100hrs because dataset/source licenses need manual sign-off.",
     )
-    parser.add_argument("--external-splits", nargs="*", default=["train", "validation", "test"])
+    parser.add_argument(
+        "--external-splits",
+        nargs="*",
+        default=["train"],
+        choices=["train", "validation", "test"],
+        help="External splits to add to model training. Defaults to train only so external validation/test remain usable gates.",
+    )
+    parser.add_argument(
+        "--allow-external-eval-splits-in-train",
+        action="store_true",
+        help="Required to add external validation/test labels to training. This permanently invalidates those splits as evaluation gates.",
+    )
     parser.add_argument("--fleurs-max-per-language", type=int, default=None)
     parser.add_argument("--salt-max", type=int, default=None)
     parser.add_argument("--salt-configs", nargs="*", default=["multispeaker-lug", "studio-lug"])
     parser.add_argument("--lingala-100hrs-max", type=int, default=None)
     parser.add_argument("--skip-duration", action="store_true")
-    return parser.parse_args()
+    args = parser.parse_args()
+    eval_splits = sorted(set(args.external_splits) & {"validation", "test"})
+    if eval_splits and not args.allow_external_eval_splits_in_train:
+        parser.error(
+            f"external evaluation splits {eval_splits} cannot enter training without "
+            "--allow-external-eval-splits-in-train"
+        )
+    return args
 
 
 def load_rows(path: Path) -> list[dict[str, str]]:
