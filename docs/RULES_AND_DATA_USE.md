@@ -143,3 +143,14 @@ Phase 1 does not train on external datasets and does not relabel WAXAL examples.
 - prepares a clean official-WAXAL subset for XLS-R 300M CTC fine-tuning.
 
 If external data becomes strategically necessary, ask Zindi in the challenge discussion and save the response before using it.
+
+## Semi-supervised use of the official unlabeled split (2026-08-03)
+
+The corrected Phase-2 campaign trains a continuation of the champion on
+pseudo-labeled audio from `google/WaxalNLP` **unlabeled** lin/sna splits — part
+of the challenge-specified dataset, not external data. Labels are generated
+exclusively by our own champion model (greedy/beam-agreement filtered); no
+external model or service is involved. Phase-2 test audio is never used for
+training or pseudo-labeling. Artifacts: `data/unlabeled_linsna/`,
+`outputs/day4_h100/pseudo_labels_raw.csv`, config to follow as
+`configs/xlsr_champion_ssl_continue.yaml`.
